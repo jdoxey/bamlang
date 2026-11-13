@@ -1,0 +1,42 @@
+== B1 shapes ==
+circle 3.14
+hexagon 10.39
+rect 6.00
+hexagon 2.60
+circle 12.57
+total 34.70
+== B2 widgets ==
+build
+  Panel
+    Button OK
+    Slider 3/10
+    Panel
+      Button Cancel
+click OK: pressed OK; focus moves to next
+  Panel
+    Button OK
+    Slider 3/10
+    Panel
+      Button Cancel
+drag Slider +4: value 3 -> 7; focus moves to next
+  Panel
+    Button OK
+    Slider 7/10
+    Panel
+      Button Cancel
+click Cancel: pressed Cancel; focus moves to next
+  Panel
+    Button OK
+    Slider 7/10
+    Panel
+      Button Cancel
+close inner panel: consumed Panel[Button Cancel]; focus moves to next
+  Panel
+    Button OK
+    Slider 7/10
+== B3 accounts ==
+deposit alice 25
+transfer alice -> bob 75
+withdraw bob 200 failed: insufficient funds: balance 125, need 200
+alice: 50
+bob: 125
