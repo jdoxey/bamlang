@@ -1,0 +1,241 @@
+// chatsim in the new language. Reads commands from stdin; output must match 12-chatsim.out.
+// Cases: 4 move, 11 back-reference (handles), 12 room freed, 13 shared limiter, 14 dead target,
+// 15 dead owner in timer, 17 callback capturing a handle, 20 re-entrant post,
+// 23 history moves to worker, 25 shared stats, 26 room name reused while archiving.
+
+type User {
+    name String
+    room Optional of Handle of Room = None
+    isBot Bool = false
+    onMessage fn(mut Server, String, String) = { s, f, t -> }
+}
+
+type Room {
+    name String
+    members List of Handle of User = []
+    history List of String = []
+}
+
+type Reminder { fire Int, user Handle of User, text String }
+type Job { room String, lines List of String }
+type Stats { rooms Int = 0, msgs Int = 0 }
+
+type Server {
+    users Pool of User = Pool of User()
+    rooms Pool of Room = Pool of Room()
+    timers List of Reminder = []
+    pending List of Job = []
+    now Int = 0
+    tokens Int = 3
+
+    fn findUser(name String) Optional of Handle of User {
+        for h in users.handles() {
+            if users.get(h)!.name == name { return Some(h) }
+        }
+        None
+    }
+
+    fn findRoom(name String) Optional of Handle of Room {
+        for h in rooms.handles() {
+            if rooms.get(h)!.name == name { return Some(h) }
+        }
+        None
+    }
+
+    mut fn takeToken() Bool {
+        if tokens <= 0 {
+            print("  rate limited")
+            return false
+        }
+        tokens = tokens - 1
+        true
+    }
+
+    // Case 20: callbacks get the whole server, so snapshot handles and copy the callback out first.
+    mut fn post(roomHandle Handle of Room, from String, text String) {
+        let room = rooms.getMut(roomHandle) else { return }
+        room.history.add(text)
+        let members = room.members.copy()
+        for m in members {
+            let user = users.get(m) else { continue }
+            if user.room != Some(roomHandle) or user.name == from { continue }
+            let callback = user.onMessage
+            callback(self, from, text)
+        }
+    }
+
+    mut fn leaveRoom(uh Handle of User) {
+        let user = users.getMut(uh) else { return }
+        let roomHandle = user.room else { return }
+        user.room = None
+        let room = rooms.getMut(roomHandle) else { return }
+        room.members.removeValue(uh)
+        if room.members.len() > 0 { return }
+        let closed = rooms.remove(roomHandle) else { return }
+        print("  room {closed.name} closed, {closed.history.len()} messages queued for archive")
+        pending.add(Job(room: closed.name, lines: closed.history))
+    }
+
+    mut fn join(name String, roomName String) {
+        var uh Handle of User
+        if let existing = findUser(name) {
+            leaveRoom(existing)
+            uh = existing
+        } else {
+            let bot = name.startsWith("echobot")
+            uh = users.add(User(name: name, isBot: bot))
+            let me = uh
+            users.getMut(uh)!.onMessage = if bot {
+                { s, f, t -> botReceive(s, me, f, t) }
+            } else {
+                { s, f, t -> humanReceive(s, me, f, t) }
+            }
+        }
+        var rh Handle of Room
+        if let existing = findRoom(roomName) {
+            rh = existing
+        } else {
+            rh = rooms.add(Room(name: roomName))
+        }
+        let room = rooms.getMut(rh)!
+        room.members.add(uh)
+        let count = room.members.len()
+        users.getMut(uh)!.room = Some(rh)
+        print("  {name} joined {roomName} ({count} members)")
+    }
+
+    mut fn dropUser(uh Handle of User) {
+        leaveRoom(uh)
+        let user = users.remove(uh) else { return }
+        print("  {user.name} left")
+    }
+
+    mut fn tick(n Int) {
+        for _ in 0..n {
+            now = now + 1
+            if tokens < 3 { tokens = tokens + 1 }
+            var keep List of Reminder = []
+            for r in timers.take() {
+                if r.fire > now {
+                    keep.add(r)
+                } else if let user = users.get(r.user) {
+                    print("  reminder for {user.name}: {r.text}")
+                } else {
+                    print("  reminder dropped (user gone)")
+                }
+            }
+            timers = keep
+        }
+        print("  now={now}")
+    }
+}
+
+fn humanReceive(server mut Server, me Handle of User, from String, text String) {
+    let user = server.users.get(me) else { return }
+    let roomHandle = user.room else { return }
+    let room = server.rooms.get(roomHandle) else { return }
+    print("  [{room.name}] {user.name} <- {from}: {text}")
+}
+
+fn botReceive(server mut Server, me Handle of User, from String, text String) {
+    if let sender = server.findUser(from) {
+        if server.users.get(sender)!.isBot { return }
+    }
+    let user = server.users.get(me) else { return }
+    let roomHandle = user.room else { return }
+    let name = user.name.copy()
+    server.post(roomHandle, name, "echo: {text}")
+}
+
+fn splitWords(line String) List of String {
+    var out List of String = []
+    var current = ""
+    var quoted = false
+    for c in line.chars() {
+        if c == "\"" {
+            quoted = not quoted
+        } else if c == " " and not quoted {
+            if current.len() > 0 {
+                out.add(current)
+                current = ""
+            }
+        } else {
+            current = current + c
+        }
+    }
+    if current.len() > 0 { out.add(current) }
+    out
+}
+
+fn flush(server mut Server, jobs Channel of Job, done Channel of String) {
+    let count = server.pending.len()
+    for job in server.pending.take() { jobs.send(job) }
+    for _ in 0..count { print("  {done.recv()!}") }
+}
+
+fn main() {
+    var server = Server()
+    let stats = Mutex of Stats(Stats())
+    let jobs = Channel of Job()
+    let done = Channel of String()
+
+    scope { s ->
+        s.spawn {                                   // case 23, 25: the archive worker
+            loop {
+                let job = jobs.recv() else { break }
+                var bytes = 0
+                for line in job.lines { bytes = bytes + line.len() }
+                lock stats { st ->
+                    st.rooms = st.rooms + 1
+                    st.msgs = st.msgs + job.lines.len()
+                }
+                done.send("archived {job.room}: {job.lines.len()} msgs, {bytes} bytes")
+            }
+        }
+
+        for line in stdin.lines() {
+            if line.len() == 0 { continue }
+            print("> {line}")
+            let w = splitWords(line)
+            let cmd = w[0]
+            let n = w.len()
+            if (cmd == "join" or cmd == "move") and n == 3 {
+                server.join(w[1], w[2])
+            } else if cmd == "leave" and n == 2 {
+                if let uh = server.findUser(w[1]) { server.dropUser(uh) } else { print("  no such user") }
+            } else if cmd == "say" and n == 3 {
+                let uh = server.findUser(w[1]) else { print("  not in a room"); continue }
+                let roomHandle = server.users.get(uh)!.room else { print("  not in a room"); continue }
+                if server.takeToken() { server.post(roomHandle, w[1], w[2]) }
+            } else if cmd == "dm" and n == 4 {
+                let from = server.findUser(w[1]) else { print("  no such user"); continue }
+                let to = server.findUser(w[2]) else { print("  dm failed: {w[2]} is not here"); continue }
+                if server.takeToken() {
+                    let callback = server.users.get(to)!.onMessage
+                    callback(server, w[1], w[3])
+                }
+            } else if cmd == "remind" and n == 4 {
+                if let uh = server.findUser(w[1]) {
+                    server.timers.add(Reminder(fire: server.now + (w[2].toInt() or 0), user: uh, text: w[3]))
+                    print("  reminder set")
+                } else {
+                    print("  no such user")
+                }
+            } else if cmd == "tick" and n == 2 {
+                server.tick(w[1].toInt() or 0)
+            } else if cmd == "flush" {
+                flush(server, jobs, done)
+            } else if cmd == "stats" {
+                lock stats { st ->
+                    print("  users={server.users.len()} rooms={server.rooms.len()} timers={server.timers.len()} archived_rooms={st.rooms} archived_msgs={st.msgs} pending={server.pending.len()}")
+                }
+            } else {
+                print("  bad command")
+            }
+        }
+
+        for h in server.users.handles() { server.dropUser(h) }
+        flush(server, jobs, done)
+        jobs.close()
+    }
+}

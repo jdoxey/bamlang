@@ -1,0 +1,19 @@
+enum Shape {
+    Circle(radius Float)
+    Rect(width Float, height Float)
+    Empty
+}
+
+fn area(s Shape) Float {
+    match s {
+        Circle(r) -> 3.0 * r * r
+        Rect(w, h) -> w * h
+        Empty -> 0.0
+    }
+}
+
+fn main() {
+    print(area(Circle(radius: 2.0)))
+    print(area(Rect(3.0, 4.5)))
+    print(area(Empty))
+}

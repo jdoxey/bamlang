@@ -68,6 +68,13 @@ Adopt **A**.
 7. Debug builds: a lock-order checker reports cycles (R4); lock held across `recv` is reported.
 8. Deadlock is not prevented. A thread panic is reported at `join`.
 
+## Amendment (2026-11-13, found while writing the D6 corpus)
+
+As written, rule 1 let a thread own a `Mutex` or `Channel` only by moving it in, so main and the worker could not share one. Corrected:
+1. **`scope { s -> s.spawn { ... } }`** runs threads that are all joined when the scope ends. Scoped threads may *borrow* values of the internally synchronised built-ins (`Mutex`, `Channel`, `Atomic`) from the enclosing function, and may also take moved values. No other borrow may be captured.
+2. Plain `spawn` keeps rule 1: moved captures only. A plain-spawned thread therefore cannot share a mutex or channel with its parent; use `scope` for that. A split sender/receiver pair for long-lived unscoped threads is deferred (re-open if D11 or M5 needs it).
+3. `Channel of T` is a single value (not split) and `close()` ends `recv` with `None` once drained.
+
 ## Consequences
 
 - Easier: races are compile errors with no annotations; forgotten locks are impossible.

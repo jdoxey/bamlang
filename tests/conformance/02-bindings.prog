@@ -1,0 +1,12 @@
+// let is immutable, var is mutable
+fn main() {
+    let a = 6
+    let b = 7
+    var total = a * b
+    total = total + 1
+    print("total is {total}")
+    let half = total / 2
+    let ratio = 7.0 / 2.0
+    print("{half} {ratio}")
+    print(total % 5 == 3 and not (a > b))
+}

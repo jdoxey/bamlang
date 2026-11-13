@@ -1,0 +1,17 @@
+fn fib(n Int) Int {
+    if n < 2 { return n }
+    fib(n - 1) + fib(n - 2)
+}
+
+fn apply(f fn(Int) Int, x Int) Int { f(x) }
+
+fn main() {
+    print(fib(10))
+    let offset = 100
+    let addOffset = { x -> x + offset }
+    print(apply(addOffset, 5))
+    let nums = [1, 2, 3, 4]
+    let doubled = nums.map { x -> x * 2 }
+    print(doubled)
+    print(nums.filter { x -> x > 2 }.len())
+}

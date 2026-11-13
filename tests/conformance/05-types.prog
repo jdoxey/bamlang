@@ -1,0 +1,21 @@
+type Point {
+    x Int
+    y Int
+
+    fn lengthSquared() Int { x * x + y * y }
+
+    mut fn moveBy(dx Int, dy Int) {
+        x = x + dx
+        y = y + dy
+    }
+}
+
+fn main() {
+    var p = Point(x: 3, y: 4)
+    print(p.lengthSquared())
+    p.moveBy(dx: 1, dy: -1)
+    print("{p.x},{p.y}")
+    let q = p.copy()
+    p.moveBy(10, 10)
+    print("{q.x},{q.y} {p.x},{p.y}")
+}

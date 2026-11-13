@@ -1,0 +1,20 @@
+type Node {
+    label String
+    parent Optional of Handle of Node
+}
+
+fn describe(nodes Pool of Node, h Handle of Node) String {
+    let node = nodes.get(h) else { return "(gone)" }
+    let up = node.parent else { return node.label }
+    "{node.label} < {describe(nodes, up)}"
+}
+
+fn main() {
+    var nodes = Pool of Node()
+    let root = nodes.add(Node(label: "root", parent: None))
+    let child = nodes.add(Node(label: "child", parent: Some(root)))
+    print(describe(nodes, child))
+    nodes.remove(root)
+    print(describe(nodes, child))
+    print(nodes.len())
+}

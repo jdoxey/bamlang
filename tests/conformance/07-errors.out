@@ -1,0 +1,5 @@
+Ok(42)
+Err(not positive: -4)
+Err(not an integer: x)
+none
+a

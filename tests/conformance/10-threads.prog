@@ -1,0 +1,15 @@
+fn main() {
+    let total = Mutex of Int(0)
+    let jobs = Channel of Int()
+    scope { s ->
+        s.spawn {
+            loop {
+                let n = jobs.recv() else { break }
+                lock total { t -> t = t + n }
+            }
+        }
+        for i in 1..=4 { jobs.send(i) }
+        jobs.close()
+    }
+    lock total { t -> print(t) }
+}

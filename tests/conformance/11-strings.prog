@@ -1,0 +1,20 @@
+/* block comments /* nest */ fine */
+fn main() {
+    let name = "Ada"
+    let n = 3
+    print("{name} has {n + 1} apples")
+    print("braces: \{ok}")
+    print(name.upper() + "!")
+    print(name.len())
+    print("a,b,c".split(",").len())
+    let long = 1 +
+        2 +
+        3
+    print(long)
+    let chained = [3, 1, 2]
+        .sorted()
+        .map { x -> x * 2 }
+    print(chained)
+    let a = 1; let b = 2
+    print(a + b)
+}

@@ -1,0 +1,17 @@
+interface Greeter { fn greet(name String) String }
+
+type Formal { fn greet(name String) String { "Good day, {name}." } }
+type Casual { fn greet(name String) String { "hey {name}" } }
+
+fn welcome(g Greeter, name String) {
+    print(g.greet(name))
+}
+
+fn main() {
+    welcome(Formal(), "Ada")
+    welcome(Casual(), "Bob")
+    var all List of Greeter = []
+    all.add(Formal())
+    all.add(Casual())
+    for g in all { print(g.greet("everyone")) }
+}

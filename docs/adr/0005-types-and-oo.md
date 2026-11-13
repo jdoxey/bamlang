@@ -52,7 +52,7 @@ A beats D by 8, more than the 5-point tie band.
 
 The chatsim models (`docs/examples/chatsim/`) all had the same shape: a `User` with a name, a room handle, a callback; a `Room` with a member list of handles and a history. In every model the callback was a free function taking `(world, self-handle, from, text)`; the only thing "method-like" was `post(room, ...)`. The Rust O4 model's callback had to be moved out of the user before being called (case 20), which shows that **a stored behaviour should be an interface value or function value, called with the world as an argument**, not a method on the object that stores it.
 
-Illustrative syntax, not a decision (D6):
+Illustrative syntax, superseded by ADR-0006 (methods are written with `fn`/`mut fn`):
 
 ```text
 interface MessageHandler { receive(world mut World, room Handle of Room, from String, text String) }
