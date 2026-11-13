@@ -51,7 +51,7 @@ else
     grep -q 'x *= *3\|x = 3\|\[x\]' build/debug.txt || echo "WARN: cdb output did not show p.x (see build/debug.txt)"
   elif command -v llvm-pdbutil >/dev/null 2>&1; then
     llvm-pdbutil dump -types build/spike.pdb 2>&1 | tee build/debug.txt | grep -E 'Point|LF_FIELDLIST|x|y' | head -20
-    llvm-pdbutil dump -lines build/spike.pdb 2>&1 | grep -E 'spike\.p3' | head -5
+    llvm-pdbutil dump -l build/spike.pdb 2>&1 | grep -E 'spike\.p3' | head -5
     grep -q 'Point' build/debug.txt || { echo "k2 FAIL: PDB has no Point"; exit 1; }
   else echo "SKIP debug (cdb and llvm-pdbutil missing)"; fi
 fi

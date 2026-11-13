@@ -19,6 +19,7 @@ echo "compiler build: $(( $(date +%s) - S ))s"
 cp ../spike.p3 build/spike.p3
 ( cd build && ./k3c$EXE spike.p3 -o spike$EXE ) || fail "k3c"
 ( cd build && ./spike$EXE > actual.txt ) || fail "spike run"
+tr -d "\r" < build/actual.txt > build/actual.lf && mv build/actual.lf build/actual.txt
 diff -u ../expected.txt build/actual.txt || fail "output differs from expected.txt"
 echo "output matches expected.txt"
 
@@ -28,7 +29,7 @@ if [ "$WIN" = 1 ]; then
   if command -v cdb >/dev/null; then
     ( cd build && cdb -c "bp \`spike.p3:$LINE\`; g; dx p; q" spike.exe ) 2>&1 | tee build/debug.txt
   elif command -v llvm-pdbutil >/dev/null; then
-    ( cd build && llvm-pdbutil dump -types -lines spike.pdb ) > build/debug.txt 2>&1
+    ( cd build && llvm-pdbutil dump -types -l spike.pdb ) > build/debug.txt 2>&1
     grep -E 'Point|spike\.p3' build/debug.txt | head -20
     grep -q 'Point' build/debug.txt && grep -q 'spike.p3' build/debug.txt || fail "PDB lacks Point or spike.p3 lines"
   else echo "SKIP debug (cdb and llvm-pdbutil missing)"; fi

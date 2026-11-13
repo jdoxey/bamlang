@@ -43,7 +43,7 @@ if [ "$WIN" = 1 ]; then
   if command -v cdb >/dev/null; then
     ( cd "$SPEC" && cdb -c "bp \`spike.p3:$LINE\`; g; dx p; dv; q" "$B/spike$EXE" ) | tee "$B/debug.txt" | tail -25
   elif command -v llvm-pdbutil >/dev/null; then
-    llvm-pdbutil dump -types -lines "$B/spike.pdb" | tee "$B/debug.txt" | grep -E "Point|spike.p3|\bx\b|\by\b" | head -20
+    llvm-pdbutil dump -types -l "$B/spike.pdb" | tee "$B/debug.txt" | grep -E "Point|spike.p3|\bx\b|\by\b" | head -20
   else echo "SKIP debug (cdb and llvm-pdbutil missing)"; fi
 elif [ "$OS" = Darwin ]; then
   if command -v lldb >/dev/null; then
