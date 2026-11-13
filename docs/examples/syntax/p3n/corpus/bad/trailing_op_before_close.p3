@@ -1,0 +1,4 @@
+# expect: 3: line ends with `+`
+fn f(a: Int, b: Int) -> Int {
+  return a + b +
+}

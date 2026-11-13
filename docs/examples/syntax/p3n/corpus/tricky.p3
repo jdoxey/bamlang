@@ -1,0 +1,156 @@
+# tricky: the ten hardest snippets from research.md, plus extras. Meaning is by the P3 rules only (brackets and a leading . continue; nothing else).
+
+# 1. return, newline, value: a bare return, then an unreachable expression statement
+fn t1() -> Int {
+  let x = 1
+  return
+  x
+}
+
+# 2. a line starting with ( or [ is a new statement, never a call or an index of the line before
+fn t2(a: Int) {
+  let b = a
+  (b)
+  [1, 2]
+  b
+  (a, b)
+}
+
+# 3. unary minus at the start of a line is a new statement; a trailing minus is an error outside ( ) (see bad/), so the join is parenthesised; `a -b` is binary
+fn t3(a: Int, b: Int) {
+  let c = a
+  -c
+  let d = (a -
+    b)
+  let e = a -b
+  let f = a - -b
+}
+
+# 4. leading-dot chains continue across blank lines and comment lines; ?. at line start too
+fn t4(items: List of Int) {
+  let r = items
+    .filter(keep: fn(x) => x > 0)
+
+    # a comment between the links
+    .map(each: fn(x) => x * 2)
+    ?.first()
+  r
+}
+
+# 5. a trailing operator continues only inside ( ); a trailing comma or opener only inside [ ] or ( )
+fn t5(a: Int, b: Int) -> Int {
+  let s = (a +
+    b *
+    2)
+  let t = [
+    1,
+    2,
+  ]
+  return s
+}
+
+# 6. a multi-line condition is wrapped in ( ); inside, leading and / or are plain whitespace
+fn t6(a: Int, b: Int, c: Int) -> Bool {
+  if (a > 0
+      and b > 0
+      or c > 0) {
+    return true
+  }
+  return (a > 0 and
+    b > 0)
+}
+
+# 7. the block opens on the header line, also for lambdas; `} else {` shares the line
+fn t7(items: List of Int, c: Crew) {
+  c.go(task: fn() {
+    for x in items {
+      print(text: x)
+    }
+  })
+  if items.is_empty() {
+    print(text: "empty")
+  } else if items.len() == 1 {
+    print(text: "one")
+  } else {
+    print(text: "many")
+  }
+}
+
+# 8. try handlers: `else e {` stays on the line of the try operand (`else` on the next line is an error)
+fn t8() fails {
+  let a = try f(n: 1) else e {
+    return
+  }
+  let b = try f(n: 2) else _ { }
+  try g() context "ctx"
+}
+
+# 9. multi-line argument lists with trailing commas; named args; field-list ordering args
+fn t9(rows: List of Row) {
+  let sorted = rows.sort_by(
+    .dept,
+    .salary desc,
+    .name,
+  )
+  let w = Widget(
+    label: "OK",
+    size: 3,
+  )
+  rows.sort_by(.dept desc, .a.b)
+}
+
+# 10. multi-line declarations; (a < b) > (c) is two comparisons, never a generic; `a < b > c` is an error (see bad/)
+fn t10(
+  a: Int,
+  b: Int,
+  c: Int = 3,
+) -> Int {
+  let g = (a < b) > (c)
+  return g
+}
+
+# 11. contextual words are ordinary names: after `.` any word is a member; a word before `:` is a name
+type Tok {
+  type: Text,
+  to: Int,
+}
+enum Ev {
+  Msg(type: Text, to: Int),
+  Quit,
+}
+fn t11(tok: Tok, xs: List of Int, context: Ctx) {
+  let t = tok.type
+  let h = xs.take(count: 3)
+  send(to: a)
+  send(type: 1)
+  let lock = 1
+  let with = lock
+  let desc = 2
+  let of = desc
+  let to = of + with
+  tok.fn
+}
+fn t11b(context: Ctx, take: Int, mut self) {}
+
+# 12. a trailing , before the newline is fine in { } item bodies
+enum Color {
+  Red,
+  Green,
+}
+fn t12(c: Color) -> Int {
+  return match c {
+    Red => 1,
+    Green => 2,
+  }
+}
+
+# 13. a leading . continues after ), ], a name, a literal or self; `to` heads
+fn t13(m: Map of List of Int to Bool, l: Lru of Text to Int, s: SortedMap of Int to Int) {
+  let a = self
+    .x
+  let b = "abc"
+    .len()
+  let c = [1]
+    .len()
+  let d = "brace \{ ok"
+}

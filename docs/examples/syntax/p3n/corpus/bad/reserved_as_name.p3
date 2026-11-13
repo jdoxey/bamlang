@@ -1,0 +1,4 @@
+# expect: 3: expected a variable name, found 'type'
+fn f() {
+  let type = 1
+}

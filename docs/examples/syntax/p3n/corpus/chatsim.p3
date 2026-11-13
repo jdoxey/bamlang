@@ -1,0 +1,304 @@
+# chatsim in P1 syntax, from c/chatsim.c. Pools and handles replace raw pointers; the archive worker is a crew child.
+use std.sync
+use std.text as text
+
+const RATE_LIMIT = 3
+
+type User {
+  pub name: Str
+  room: Optional of Handle of Room
+  last_from: Optional of Handle of User
+  had_contact: Bool = false
+  is_bot: Bool = false
+
+  drop(mut self) {
+    print(text: "user {self.name} dropped")
+  }
+}
+
+type Member {
+  user: Handle of User
+  cb: fn(mut srv: Server, room: Handle of Room, from: Handle of User, text: Str)
+}
+
+type Room {
+  name: Str
+  members: List of Member = []
+  history: List of Str = []
+
+  fn remove_member(mut self, u: Handle of User) {
+    var i = 0
+    while i < self.members.len() {
+      if self.members[i].user == u {
+        self.members.remove_at(at: i)
+        break
+      }
+      i += 1
+    }
+  }
+}
+
+type Timer { due: Int, user: Optional of Handle of User, user_name: Str, text: Str }
+type RateEntry { tick: Int, count: Int }
+type Job { room_name: Str, history: List of Str }
+
+type Stats {
+  messages: Int = 0
+  archived_rooms: Int = 0
+  archived_messages: Int = 0
+  archive: List of Str = []
+}
+
+type Server {
+  users: Pool of User = Pool of User()
+  rooms: Pool of Room = Pool of Room()
+  timers: List of Timer = []
+  rates: Map of Str to RateEntry = Map of Str to RateEntry()
+  clock: Int = 0
+  jobs: Channel of Job
+  stats: Mutex of Stats
+
+  fn find_user(self, name: Str) -> Optional of Handle of User {
+    for h in self.users.handles() {
+      if self.users[h].name == name { return some(value: h) }
+    }
+    return none
+  }
+
+  fn find_room(self, name: Str) -> Optional of Handle of Room {
+    for h in self.rooms.handles() {
+      if self.rooms[h].name == name { return some(value: h) }
+    }
+    return none
+  }
+
+  fn rate_ok(mut self, name: Str) -> Bool {
+    if not self.rates.contains(item: name) {
+      self.rates[name] = RateEntry(tick: self.clock, count: 0)
+    }
+    with e = self.rates[name] {
+      if e.tick != self.clock {
+        e.tick = self.clock
+        e.count = 0
+      }
+      if e.count >= RATE_LIMIT {
+        print(text: "rate limited: {name}")
+        return false
+      }
+      e.count += 1
+    }
+    return true
+  }
+
+  fn bump(self, n: Int) {
+    lock self.stats {
+      self.stats.messages += n
+    }
+  }
+
+  fn post(mut self, room: Handle of Room, from: Handle of User, text: Str) {
+    let who = self.users[from].name
+    self.rooms[room].history.push(item: "{who}: {text}")
+    self.bump(n: 1)
+    print(text: "#{self.rooms[room].name} {who}: {text}")
+    var i = 0
+    while i < self.rooms[room].members.len() {   # index, not iterator: a callback may post again
+      let m = self.rooms[room].members[i]
+      if m.user != from { m.cb(srv: self, room: room, from: from, text: text) }
+      i += 1
+    }
+  }
+
+  fn open_room(mut self, name: Str) -> Handle of Room {
+    print(text: "#{name} opened")
+    return self.rooms.add(value: Room(name: name.copy()))
+  }
+
+  fn enter_room(mut self, u: Handle of User, room_name: Str) {
+    let r = if found = self.find_room(name: room_name) { found } else { self.open_room(name: room_name) }
+    let cb = if self.users[u].is_bot {
+      fn(srv, room, from, text) {
+        print(text: "  {srv.users[u].name} sees {srv.users[from].name}: {text}")
+        if not srv.users[from].is_bot {
+          srv.post(room: room, from: u, text: "echo: {text}")
+        }
+      }
+    } else {
+      fn(srv, room, from, text) {
+        print(text: "  {srv.users[u].name} sees {srv.users[from].name}: {text}")
+      }
+    }
+    self.rooms[r].members.push(item: Member(user: u, cb: cb))
+    self.users[u].room = some(value: r)
+    print(text: "{self.users[u].name} joined #{self.rooms[r].name}")
+  }
+
+  fn exit_room(mut self, u: Handle of User) {
+    if r = self.users[u].room {
+      self.rooms[r].remove_member(u: u)
+      self.users[u].room = none
+      print(text: "{self.users[u].name} left #{self.rooms[r].name}")
+      if self.rooms[r].members.is_empty() {
+        let room = self.rooms.take_out(at: r).unwrap()
+        print(text: "#{room.name} closed, {room.history.len()} messages sent to archive")
+        self.jobs.send(value: Job(room_name: room.name, history: room.history))   # history moves to the worker
+      }
+    }
+  }
+
+  fn free_user(mut self, u: Handle of User) {
+    for h in self.users.handles() {
+      if self.users[h].last_from == some(value: u) { self.users[h].last_from = none }
+    }
+    for i in 0..self.timers.len() {
+      if self.timers[i].user == some(value: u) { self.timers[i].user = none }
+    }
+    self.rates.remove(key: self.users[u].name)
+    self.users.remove(handle: u)
+  }
+
+  fn cmd_join(mut self, name: Str, room: Str) {
+    if self.find_user(name: name) != none {
+      print(text: "join failed: {name} is already here")
+      return
+    }
+    let u = self.users.add(value: User(name: name.copy(), room: none, last_from: none, is_bot: name == "echobot"))
+    self.enter_room(u: u, room_name: room)
+  }
+
+  fn cmd_say(mut self, name: Str, text: Str) {
+    if u = self.find_user(name: name) {
+      if not self.rate_ok(name: name) { return }
+      if r = self.users[u].room { self.post(room: r, from: u, text: text) }
+    } else {
+      print(text: "say failed: {name} is not here")
+    }
+  }
+
+  fn deliver_dm(mut self, from: Handle of User, dest: Handle of User, text: Str) {
+    let fname = self.users[from].name
+    let dname = self.users[dest].name
+    print(text: "dm {fname} -> {dname}: {text}")
+    print(text: "  {dname} sees dm from {fname}: {text}")
+    self.users[dest].last_from = some(value: from)
+    self.users[dest].had_contact = true
+    self.bump(n: 1)
+  }
+
+  fn cmd_dm(mut self, from_name: Str, to_name: Str, text: Str) {
+    match (self.find_user(name: from_name), self.find_user(name: to_name)) {
+      (none, _) => print(text: "dm failed: {from_name} is not here")
+      (_, none) => print(text: "dm failed: {to_name} is not here")
+      (some(f), some(d)) => {
+        if self.rate_ok(name: from_name) { self.deliver_dm(from: f, dest: d, text: text) }
+      }
+    }
+  }
+
+  fn cmd_remind(mut self, name: Str, delay: Int, text: Str) {
+    if u = self.find_user(name: name) {
+      let due = self.clock + delay
+      var i = 0
+      while i < self.timers.len() and self.timers[i].due <= due { i += 1 }
+      self.timers.insert(at: i, value: Timer(due: due, user: some(value: u), user_name: name.copy(), text: text.copy()))
+      print(text: "reminder for {name} set for tick {due}")
+    } else {
+      print(text: "remind failed: {name} is not here")
+    }
+  }
+
+  fn cmd_tick(mut self, n: Int) {
+    for _ in 0..n {
+      self.clock += 1
+      while (self.timers.len() > 0
+          and self.timers[0].due <= self.clock) {
+        let t = self.timers.remove_at(at: 0)
+        match t.user {
+          some(h) => print(text: "reminder for {self.users[h].name}: {t.text}")
+          none => print(text: "reminder for {t.user_name} dropped: user has left")
+        }
+      }
+    }
+    print(text: "clock is {self.clock}")
+  }
+
+  fn cmd_move(mut self, name: Str, room: Str) {
+    if u = self.find_user(name: name) {
+      self.exit_room(u: u)
+      self.enter_room(u: u, room_name: room)
+    } else {
+      print(text: "move failed: {name} is not here")
+    }
+  }
+
+  fn cmd_leave(mut self, name: Str) {
+    if u = self.find_user(name: name) {
+      self.exit_room(u: u)
+      self.free_user(u: u)
+    } else {
+      print(text: "leave failed: {name} is not here")
+    }
+  }
+
+  fn cmd_stats(self) {
+    self.jobs.flush()
+    lock self.stats {
+      print(text: ("stats: users={self.users.len()} rooms={self.rooms.len()}"
+        + " messages={self.stats.messages}"
+        + " archived_rooms={self.stats.archived_rooms}"))
+      for line in self.stats.archive { print(text: "  archive {line}") }
+    }
+  }
+
+  fn handle(mut self, line: Str) {
+    let w = line.split(sep: " ")
+    match w[0] {
+      "join"   => self.cmd_join(name: w[1], room: w[2])
+      "say"    => self.cmd_say(name: w[1], text: w.rest(from: 2).join(sep: " "))
+      "dm"     => self.cmd_dm(from_name: w[1], to_name: w[2], text: w.rest(from: 3).join(sep: " "))
+      "remind" => self.cmd_remind(name: w[1], delay: w[2].to_int().unwrap(), text: w.rest(from: 3).join(sep: " "))
+      "tick"   => self.cmd_tick(n: w[1].to_int().unwrap())
+      "move"   => self.cmd_move(name: w[1], room: w[2])
+      "leave"  => self.cmd_leave(name: w[1])
+      "stats"  => self.cmd_stats()
+      _        => print(text: "bad command: {w[0]}")
+    }
+  }
+}
+
+fn archive_worker(jobs: Channel of Job, stats: Mutex of Stats) {
+  while true {
+    if job = jobs.recv() {
+      sleep_ms(ms: 20)
+      var bytes = 0
+      for line in job.history { bytes += line.len() }
+      let n = job.history.len()
+      let entry = "{job.room_name}: {n} messages, {bytes} bytes"
+      lock stats {
+        stats.archived_rooms += 1
+        stats.archived_messages += n
+        stats.archive.push(item: entry)
+      }
+    } else {
+      break
+    }
+  }
+}
+
+fn main() fails {
+  let jobs = Channel of Job()
+  let stats = Mutex(value: Stats())
+  var srv = Server(jobs: jobs, stats: stats)
+  try crew c {
+    c.go(task: fn() => archive_worker(jobs: jobs, stats: stats))
+    for line in stdin.lines() {
+      if line.is_empty() or line.starts_with(prefix: "#") { continue }
+      print(text: "> {line}")
+      srv.handle(line: line)
+    }
+    jobs.close()
+  } else e {
+    print(text: "fatal: {e}")
+  }
+  print(text: "exit: alive users={srv.users.len()} rooms={srv.rooms.len()}")
+}

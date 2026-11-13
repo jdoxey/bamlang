@@ -1,0 +1,5 @@
+# expect: 4: 'else' must follow the closing '}' of the if on the same line
+fn f() fails {
+  let b = try g()
+    else e { }
+}

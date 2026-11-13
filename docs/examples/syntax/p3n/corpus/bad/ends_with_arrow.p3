@@ -1,0 +1,5 @@
+# expect: 2: line ends with `->`
+fn f(a: Bool) ->
+  Int {
+  return 1
+}

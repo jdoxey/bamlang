@@ -1,0 +1,5 @@
+# expect: 3: line ends with `of`
+type P {
+  xs: List of
+    Int
+}

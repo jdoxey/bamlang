@@ -1,0 +1,4 @@
+# expect: 3: write \{ for a literal brace
+fn f() {
+  print("a { b")
+}

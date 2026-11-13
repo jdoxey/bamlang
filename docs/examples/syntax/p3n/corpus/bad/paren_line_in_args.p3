@@ -1,0 +1,5 @@
+# expect: 4: line starts with `(` after a complete item: add `,` or move it to the previous line
+fn f(a: Int, b: Int) -> Int {
+  return max(a
+    (b))
+}

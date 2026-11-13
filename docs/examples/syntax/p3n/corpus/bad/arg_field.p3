@@ -1,0 +1,4 @@
+# expect: 3: argument needs a name
+fn f(p: Point) {
+  show(p.x)
+}

@@ -1,0 +1,333 @@
+(file
+  (fn t1
+    (ret
+      (t Int))
+    (block
+      (let x
+        (int 1))
+      (return)
+      (name x)))
+  (fn t2
+    (param a
+      (t Int))
+    (block
+      (let b
+        (name a))
+      (name b)
+      (list
+        (int 1)
+        (int 2))
+      (name b)
+      (tuple
+        (name a)
+        (name b))))
+  (fn t3
+    (param a
+      (t Int))
+    (param b
+      (t Int))
+    (block
+      (let c
+        (name a))
+      (un -
+        (name c))
+      (let d
+        (bin -
+          (name a)
+          (name b)))
+      (let e
+        (bin -
+          (name a)
+          (name b)))
+      (let f
+        (bin -
+          (name a)
+          (un -
+            (name b))))))
+  (fn t4
+    (param items
+      (t List
+        (t Int)))
+    (block
+      (let r
+        (mcall? first
+          (mcall map
+            (mcall filter
+              (name items)
+              (named keep
+                (lambda
+                  (param x)
+                  (bin >
+                    (name x)
+                    (int 0)))))
+            (named each
+              (lambda
+                (param x)
+                (bin *
+                  (name x)
+                  (int 2)))))))
+      (name r)))
+  (fn t5
+    (param a
+      (t Int))
+    (param b
+      (t Int))
+    (ret
+      (t Int))
+    (block
+      (let s
+        (bin +
+          (name a)
+          (bin *
+            (name b)
+            (int 2))))
+      (let t
+        (list
+          (int 1)
+          (int 2)))
+      (return
+        (name s))))
+  (fn t6
+    (param a
+      (t Int))
+    (param b
+      (t Int))
+    (param c
+      (t Int))
+    (ret
+      (t Bool))
+    (block
+      (if
+        (bin or
+          (bin and
+            (bin >
+              (name a)
+              (int 0))
+            (bin >
+              (name b)
+              (int 0)))
+          (bin >
+            (name c)
+            (int 0)))
+        (block
+          (return
+            (bool true))))
+      (return
+        (bin and
+          (bin >
+            (name a)
+            (int 0))
+          (bin >
+            (name b)
+            (int 0))))))
+  (fn t7
+    (param items
+      (t List
+        (t Int)))
+    (param c
+      (t Crew))
+    (block
+      (mcall go
+        (name c)
+        (named task
+          (lambda
+            (block
+              (for
+                (pbind x)
+                (name items)
+                (block
+                  (call
+                    (name print)
+                    (named text
+                      (name x)))))))))
+      (if
+        (mcall is_empty
+          (name items))
+        (block
+          (call
+            (name print)
+            (named text
+              (str "empty"))))
+        (else
+          (if
+            (bin ==
+              (mcall len
+                (name items))
+              (int 1))
+            (block
+              (call
+                (name print)
+                (named text
+                  (str "one"))))
+            (else
+              (block
+                (call
+                  (name print)
+                  (named text
+                    (str "many"))))))))))
+  (fn t8 fails
+    (block
+      (let a
+        (try-or e
+          (call
+            (name f)
+            (named n
+              (int 1)))
+          (block
+            (return))))
+      (let b
+        (try-or _
+          (call
+            (name f)
+            (named n
+              (int 2)))
+          (block)))
+      (try-context
+        (call
+          (name g))
+        (str "ctx"))))
+  (fn t9
+    (param rows
+      (t List
+        (t Row)))
+    (block
+      (let sorted
+        (mcall sort_by
+          (name rows)
+          (key dept)
+          (key salary desc)
+          (key name)))
+      (let w
+        (call
+          (name Widget)
+          (named label
+            (str "OK"))
+          (named size
+            (int 3))))
+      (mcall sort_by
+        (name rows)
+        (key dept desc)
+        (key a.b))))
+  (fn t10
+    (param a
+      (t Int))
+    (param b
+      (t Int))
+    (param c
+      (t Int)
+      (default
+        (int 3)))
+    (ret
+      (t Int))
+    (block
+      (let g
+        (bin >
+          (bin <
+            (name a)
+            (name b))
+          (name c)))
+      (return
+        (name g))))
+  (type Tok
+    (field type
+      (t Text))
+    (field to
+      (t Int)))
+  (enum Ev
+    (variant Msg
+      (vfield type
+        (t Text))
+      (vfield to
+        (t Int)))
+    (variant Quit))
+  (fn t11
+    (param tok
+      (t Tok))
+    (param xs
+      (t List
+        (t Int)))
+    (param context
+      (t Ctx))
+    (block
+      (let t
+        (field type
+          (name tok)))
+      (let h
+        (mcall take
+          (name xs)
+          (named count
+            (int 3))))
+      (call
+        (name send)
+        (named to
+          (name a)))
+      (call
+        (name send)
+        (named type
+          (int 1)))
+      (let lock
+        (int 1))
+      (let with
+        (name lock))
+      (let desc
+        (int 2))
+      (let of
+        (name desc))
+      (let to
+        (bin +
+          (name of)
+          (name with)))
+      (field fn
+        (name tok))))
+  (fn t11b
+    (param context
+      (t Ctx))
+    (param take
+      (t Int))
+    (recv mut)
+    (block))
+  (enum Color
+    (variant Red)
+    (variant Green))
+  (fn t12
+    (param c
+      (t Color))
+    (ret
+      (t Int))
+    (block
+      (return
+        (match
+          (name c)
+          (arm
+            (pvariant Red)
+            (int 1))
+          (arm
+            (pvariant Green)
+            (int 2))))))
+  (fn t13
+    (param m
+      (t Map
+        (t List
+          (t Int))
+        (t Bool)))
+    (param l
+      (t Lru
+        (t Text)
+        (t Int)))
+    (param s
+      (t SortedMap
+        (t Int)
+        (t Int)))
+    (block
+      (let a
+        (field x
+          (name self)))
+      (let b
+        (mcall len
+          (str "abc")))
+      (let c
+        (mcall len
+          (list
+            (int 1))))
+      (let d
+        (str "brace { ok")))))

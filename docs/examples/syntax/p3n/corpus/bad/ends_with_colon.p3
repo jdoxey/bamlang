@@ -1,0 +1,5 @@
+# expect: 3: line ends with `:`
+type P {
+  x:
+    Int
+}

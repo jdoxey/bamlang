@@ -1,0 +1,5 @@
+# expect: 3: line ends with `and`
+fn f(a: Bool, b: Bool) -> Bool {
+  return a and
+    b
+}

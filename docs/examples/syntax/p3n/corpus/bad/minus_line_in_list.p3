@@ -1,0 +1,8 @@
+# expect: 5: line starts with `-` after a complete item: add `,`
+fn f() {
+  let xs = [
+    1,
+    2
+    -3,
+  ]
+}

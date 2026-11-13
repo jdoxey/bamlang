@@ -1,0 +1,4 @@
+# expect: 3: expected end of line or ';' before '{'
+fn f() fails {
+  let b = try g() or e { }
+}

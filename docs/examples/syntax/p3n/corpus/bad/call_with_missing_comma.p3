@@ -1,0 +1,4 @@
+# expect: 3: a `,` is probably missing
+fn f(a: Int, b: Int) {
+  g(a b)
+}

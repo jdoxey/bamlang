@@ -1,0 +1,1594 @@
+(file
+  (enum Kind
+    (variant Window)
+    (variant Panel)
+    (variant Button)
+    (variant Label)
+    (variant Image))
+  (type OnClick
+    (field action
+      (t Str))
+    (field arg
+      (t Str))
+    (field run
+      (fnt
+        (arg me
+          (t Handle
+            (t Widget))))))
+  (type Widget
+    (field kind
+      (t Kind))
+    (field name
+      (t Str))
+    (field text
+      (t Str))
+    (field parent
+      (t Handle
+        (t Widget)))
+    (field kids
+      (t List
+        (t Handle
+          (t Widget)))
+      (default
+        (list)))
+    (field on_click
+      (t Optional
+        (t OnClick))
+      (default
+        (none)))
+    (field img
+      (t Handle
+        (t CacheEntry))
+      (default
+        (none)))
+    (field sub
+      (t Handle
+        (t Sub))
+      (default
+        (none)))
+    (drop
+      (recv mut)
+      (block
+        (call
+          (name print)
+          (named text
+            (interp
+              (s "  drop ")
+              (part
+                (field kind
+                  (name self)))
+              (s " ")
+              (part
+                (field name
+                  (name self))))))
+        (if
+          (mcall has
+            (name cache)
+            (named handle
+              (field img
+                (name self))))
+          (block
+            (call
+              (name release_image)
+              (named h
+                (field img
+                  (name self))))))
+        (if
+          (mcall has
+            (name subs)
+            (named handle
+              (field sub
+                (name self))))
+          (block
+            (call
+              (name unsubscribe)
+              (named h
+                (field sub
+                  (name self)))))))))
+  (type CacheEntry
+    (field file
+      (t Str))
+    (field bytes
+      (t Str))
+    (field users
+      (t Int))
+    (drop
+      (recv mut)
+      (block
+        (call
+          (name print)
+          (named text
+            (interp
+              (s "  cache: drop ")
+              (part
+                (field file
+                  (name self)))))))))
+  (type Sub
+    (field run
+      (fnt
+        (arg me
+          (t Handle
+            (t Sub)))))
+    (drop
+      (recv mut)
+      (block
+        (call
+          (name print)
+          (named text
+            (str "  drop subscriber"))))))
+  (var widgets
+    (call
+      (t Pool
+        (t Widget))))
+  (var subs
+    (call
+      (t Pool
+        (t Sub))))
+  (var cache
+    (call
+      (t Pool
+        (t CacheEntry))))
+  (var windows
+    (t List
+      (t Handle
+        (t Widget)))
+    (list))
+  (var sub_order
+    (t List
+      (t Handle
+        (t Sub)))
+    (list))
+  (var count
+    (int 0))
+  (fn acquire_image
+    (param file
+      (t Str))
+    (ret
+      (t Handle
+        (t CacheEntry)))
+    (block
+      (for
+        (pbind h)
+        (mcall handles
+          (name cache))
+        (block
+          (if
+            (bin ==
+              (field file
+                (index
+                  (name cache)
+                  (name h)))
+              (name file))
+            (block
+              (opassign +
+                (field users
+                  (index
+                    (name cache)
+                    (name h)))
+                (int 1))
+              (call
+                (name print)
+                (named text
+                  (interp
+                    (s "  cache: share ")
+                    (part
+                      (name file))
+                    (s " users=")
+                    (part
+                      (field users
+                        (index
+                          (name cache)
+                          (name h)))))))
+              (return
+                (name h))))))
+      (let bytes
+        (mcall repeat
+          (name file)
+          (named times
+            (int 100))))
+      (call
+        (name print)
+        (named text
+          (interp
+            (s "  cache: new ")
+            (part
+              (name file))
+            (s " (")
+            (part
+              (mcall len
+                (name bytes)))
+            (s " bytes)"))))
+      (return
+        (mcall add
+          (name cache)
+          (named value
+            (call
+              (name CacheEntry)
+              (named file
+                (mcall copy
+                  (name file)))
+              (named bytes
+                (name bytes))
+              (named users
+                (int 1))))))))
+  (fn release_image
+    (param h
+      (t Handle
+        (t CacheEntry)))
+    (block
+      (iflet e
+        (mcall get
+          (name cache)
+          (named handle
+            (name h)))
+        (block
+          (opassign -
+            (field users
+              (name e))
+            (int 1))
+          (call
+            (name print)
+            (named text
+              (interp
+                (s "  cache: release ")
+                (part
+                  (field file
+                    (name e)))
+                (s " users=")
+                (part
+                  (field users
+                    (name e))))))
+          (if
+            (bin ==
+              (field users
+                (name e))
+              (int 0))
+            (block
+              (mcall remove
+                (name cache)
+                (named handle
+                  (name h))))))
+        (else
+          (block)))))
+  (fn subscribe
+    (param run
+      (fnt
+        (arg me
+          (t Handle
+            (t Sub)))))
+    (ret
+      (t Handle
+        (t Sub)))
+    (block
+      (let h
+        (mcall add
+          (name subs)
+          (named value
+            (call
+              (name Sub)
+              (named run
+                (name run))))))
+      (mcall push
+        (name sub_order)
+        (named item
+          (name h)))
+      (return
+        (name h))))
+  (fn unsubscribe
+    (param h
+      (t Handle
+        (t Sub)))
+    (block
+      (mcall remove_value
+        (name sub_order)
+        (named value
+          (name h)))
+      (mcall remove
+        (name subs)
+        (named handle
+          (name h)))))
+  (fn notify
+    (block
+      (for
+        (pbind h)
+        (mcall copy
+          (name sub_order))
+        (block
+          (iflet s
+            (mcall get
+              (name subs)
+              (named handle
+                (name h)))
+            (block
+              (mcall run
+                (name s)
+                (named me
+                  (name h))))
+            (else
+              (block)))))))
+  (fn label_changed
+    (param label
+      (t Handle
+        (t Widget)))
+    (param me
+      (t Handle
+        (t Sub)))
+    (param once
+      (t Bool))
+    (block
+      (iflet w
+        (mcall get
+          (name widgets)
+          (named handle
+            (name label)))
+        (block
+          (assign
+            (field text
+              (name w))
+            (interp
+              (s "count=")
+              (part
+                (name count))))
+          (call
+            (name print)
+            (named text
+              (interp
+                (s "  notify ")
+                (part
+                  (field name
+                    (name w)))
+                (s ": ")
+                (part
+                  (field text
+                    (name w))))))
+          (if
+            (name once)
+            (block
+              (call
+                (name print)
+                (named text
+                  (interp
+                    (s "  once: ")
+                    (part
+                      (field name
+                        (name w)))
+                    (s " unsubscribes itself"))))
+              (assign
+                (field sub
+                  (name w))
+                (none))
+              (call
+                (name unsubscribe)
+                (named h
+                  (name me))))))
+        (else
+          (block
+            (call
+              (name print)
+              (named text
+                (str "  notify: label gone"))))))))
+  (fn find_widget
+    (param name
+      (t Str))
+    (ret
+      (t Handle
+        (t Widget)))
+    (block
+      (for
+        (pbind h)
+        (mcall handles
+          (name widgets))
+        (block
+          (if
+            (bin ==
+              (field name
+                (index
+                  (name widgets)
+                  (name h)))
+              (name name))
+            (block
+              (return
+                (name h))))))
+      (return
+        (none))))
+  (fn new_widget
+    (param parent
+      (t Handle
+        (t Widget)))
+    (param kind
+      (t Kind))
+    (param name
+      (t Str))
+    (param arg
+      (t Str))
+    (ret
+      (t Handle
+        (t Widget)))
+    (block
+      (var w
+        (call
+          (name Widget)
+          (named kind
+            (name kind))
+          (named name
+            (mcall copy
+              (name name)))
+          (named text
+            (mcall copy
+              (name arg)))
+          (named parent
+            (name parent))))
+      (if
+        (bin ==
+          (name kind)
+          (field Image
+            (name Kind)))
+        (block
+          (assign
+            (field img
+              (name w))
+            (call
+              (name acquire_image)
+              (named file
+                (name arg))))))
+      (let subscribing
+        (bin and
+          (bin ==
+            (name kind)
+            (field Label
+              (name Kind)))
+          (bin or
+            (bin ==
+              (name arg)
+              (str "count"))
+            (bin ==
+              (name arg)
+              (str "count-once")))))
+      (if
+        (name subscribing)
+        (block
+          (assign
+            (field text
+              (name w))
+            (interp
+              (s "count=")
+              (part
+                (name count))))))
+      (let h
+        (mcall add
+          (name widgets)
+          (named value
+            (name w))
+          (named owner
+            (name parent))))
+      (if
+        (bin ==
+          (name parent)
+          (none))
+        (block
+          (mcall push
+            (name windows)
+            (named item
+              (name h))))
+        (else
+          (block
+            (mcall push
+              (field kids
+                (index
+                  (name widgets)
+                  (name parent)))
+              (named item
+                (name h))))))
+      (if
+        (name subscribing)
+        (block
+          (let once
+            (bin ==
+              (name arg)
+              (str "count-once")))
+          (assign
+            (field sub
+              (index
+                (name widgets)
+                (name h)))
+            (call
+              (name subscribe)
+              (named run
+                (lambda
+                  (param me)
+                  (call
+                    (name label_changed)
+                    (named label
+                      (name h))
+                    (named me
+                      (name me))
+                    (named once
+                      (name once)))))))
+          (call
+            (name print)
+            (named text
+              (interp
+                (s "  subscribed ")
+                (part
+                  (name name)))))))
+      (return
+        (name h))))
+  (fn remove_widget
+    (param h
+      (t Handle
+        (t Widget)))
+    (block
+      (let kind
+        (field kind
+          (index
+            (name widgets)
+            (name h))))
+      (let parent
+        (field parent
+          (index
+            (name widgets)
+            (name h))))
+      (if
+        (bin ==
+          (name kind)
+          (field Window
+            (name Kind)))
+        (block
+          (mcall remove_value
+            (name windows)
+            (named value
+              (name h))))
+        (else
+          (iflet p
+            (mcall get
+              (name widgets)
+              (named handle
+                (name parent)))
+            (block
+              (mcall remove_value
+                (field kids
+                  (name p))
+                (named value
+                  (name h))))
+            (else
+              (block)))))
+      (mcall remove
+        (name widgets)
+        (named handle
+          (name h)))))
+  (fn enclosing_window
+    (param h
+      (t Handle
+        (t Widget)))
+    (ret
+      (t Handle
+        (t Widget)))
+    (block
+      (var cur
+        (name h))
+      (while
+        (bin !=
+          (name cur)
+          (none))
+        (block
+          (if
+            (bin ==
+              (field kind
+                (index
+                  (name widgets)
+                  (name cur)))
+              (field Window
+                (name Kind)))
+            (block
+              (return
+                (name cur))))
+          (assign
+            (name cur)
+            (field parent
+              (index
+                (name widgets)
+                (name cur))))))
+      (return
+        (none))))
+  (fn inc_click
+    (ret
+      (t OnClick))
+    (block
+      (return
+        (call
+          (name OnClick)
+          (named action
+            (str "inc"))
+          (named arg
+            (str ""))
+          (named run
+            (lambda
+              (param _)
+              (block
+                (opassign +
+                  (name count)
+                  (int 1))
+                (call
+                  (name print)
+                  (named text
+                    (interp
+                      (s "  count=")
+                      (part
+                        (name count)))))
+                (call
+                  (name notify)))))))))
+  (fn close_click
+    (ret
+      (t OnClick))
+    (block
+      (return
+        (call
+          (name OnClick)
+          (named action
+            (str "close"))
+          (named arg
+            (str ""))
+          (named run
+            (lambda
+              (param me)
+              (block
+                (let win
+                  (call
+                    (name enclosing_window)
+                    (named h
+                      (name me))))
+                (if
+                  (bin ==
+                    (name win)
+                    (none))
+                  (block
+                    (call
+                      (name print)
+                      (named text
+                        (str "  close: no enclosing window"))))
+                  (else
+                    (block
+                      (call
+                        (name print)
+                        (named text
+                          (interp
+                            (s "  close: removing window ")
+                            (part
+                              (field name
+                                (index
+                                  (name widgets)
+                                  (name win)))))))
+                      (call
+                        (name remove_widget)
+                        (named h
+                          (name win)))))))))))))
+  (fn open_click
+    (param window_name
+      (t Str))
+    (ret
+      (t OnClick))
+    (block
+      (let n
+        (mcall copy
+          (name window_name)))
+      (return
+        (call
+          (name OnClick)
+          (named action
+            (str "open"))
+          (named arg
+            (mcall copy
+              (name n)))
+          (named run
+            (lambda
+              (param _)
+              (block
+                (if
+                  (bin !=
+                    (call
+                      (name find_widget)
+                      (named name
+                        (name n)))
+                    (none))
+                  (block
+                    (call
+                      (name print)
+                      (named text
+                        (interp
+                          (s "  open: ")
+                          (part
+                            (name n))
+                          (s " already exists")))))
+                  (else
+                    (block
+                      (let win
+                        (call
+                          (name new_widget)
+                          (named parent
+                            (none))
+                          (named kind
+                            (field Window
+                              (name Kind)))
+                          (named name
+                            (name n))
+                          (named arg
+                            (str ""))))
+                      (call
+                        (name new_widget)
+                        (named parent
+                          (name win))
+                        (named kind
+                          (field Label
+                            (name Kind)))
+                        (named name
+                          (interp
+                            (part
+                              (name n))
+                            (s "-label")))
+                        (named arg
+                          (str "opened")))
+                      (let b
+                        (call
+                          (name new_widget)
+                          (named parent
+                            (name win))
+                          (named kind
+                            (field Button
+                              (name Kind)))
+                          (named name
+                            (interp
+                              (part
+                                (name n))
+                              (s "-close")))
+                          (named arg
+                            (str ""))))
+                      (assign
+                        (field on_click
+                          (index
+                            (name widgets)
+                            (name b)))
+                        (call
+                          (name some)
+                          (named value
+                            (call
+                              (name close_click)))))
+                      (call
+                        (name print)
+                        (named text
+                          (interp
+                            (s "  open: created window ")
+                            (part
+                              (name n)))))))))))))))
+  (fn unsub_click
+    (param target
+      (t Handle
+        (t Widget)))
+    (param label_name
+      (t Str))
+    (ret
+      (t OnClick))
+    (block
+      (return
+        (call
+          (name OnClick)
+          (named action
+            (str "unsub"))
+          (named arg
+            (mcall copy
+              (name label_name)))
+          (named run
+            (lambda
+              (param _)
+              (block
+                (iflet l
+                  (mcall get
+                    (name widgets)
+                    (named handle
+                      (name target)))
+                  (block
+                    (if
+                      (mcall has
+                        (name subs)
+                        (named handle
+                          (field sub
+                            (name l))))
+                      (block
+                        (call
+                          (name print)
+                          (named text
+                            (interp
+                              (s "  unsub: ")
+                              (part
+                                (field name
+                                  (name l)))
+                              (s " unsubscribed"))))
+                        (call
+                          (name unsubscribe)
+                          (named h
+                            (field sub
+                              (name l))))
+                        (assign
+                          (field sub
+                            (name l))
+                          (none)))
+                      (else
+                        (block
+                          (call
+                            (name print)
+                            (named text
+                              (interp
+                                (s "  unsub: ")
+                                (part
+                                  (field name
+                                    (name l)))
+                                (s " is not subscribed"))))))))
+                  (else
+                    (block
+                      (call
+                        (name print)
+                        (named text
+                          (str "  unsub: label no longer exists (stale handle)")))))))))))))
+  (fn need fails
+    (param a
+      (t Optional
+        (t Str)))
+    (param what
+      (t Str))
+    (ret
+      (t Str))
+    (block
+      (iflet v
+        (name a)
+        (block
+          (return
+            (name v))))
+      (fail
+        (interp
+          (part
+            (name what))
+          (s " needs an argument")))))
+  (fn find_label fails
+    (param name
+      (t Str))
+    (ret
+      (t Handle
+        (t Widget)))
+    (block
+      (let h
+        (call
+          (name find_widget)
+          (named name
+            (name name))))
+      (if
+        (bin or
+          (bin ==
+            (name h)
+            (none))
+          (bin !=
+            (field kind
+              (index
+                (name widgets)
+                (name h)))
+            (field Label
+              (name Kind))))
+        (block
+          (fail
+            (interp
+              (s "no such label ")
+              (part
+                (name name))))))
+      (return
+        (name h))))
+  (fn cmd_window
+    (param name
+      (t Str))
+    (block
+      (if
+        (bin !=
+          (call
+            (name find_widget)
+            (named name
+              (name name)))
+          (none))
+        (block
+          (call
+            (name error)
+            (named text
+              (interp
+                (s "name ")
+                (part
+                  (name name))
+                (s " already exists"))))
+          (return)))
+      (call
+        (name new_widget)
+        (named parent
+          (none))
+        (named kind
+          (field Window
+            (name Kind)))
+        (named name
+          (name name))
+        (named arg
+          (str "")))
+      (call
+        (name print)
+        (named text
+          (interp
+            (s "created window ")
+            (part
+              (name name)))))))
+  (fn cmd_add
+    (param parent_name
+      (t Str))
+    (param kind_name
+      (t Str))
+    (param name
+      (t Str))
+    (param arg
+      (t Optional
+        (t Str)))
+    (block
+      (let p
+        (call
+          (name find_widget)
+          (named name
+            (name parent_name))))
+      (if
+        (bin ==
+          (name p)
+          (none))
+        (block
+          (call
+            (name error)
+            (named text
+              (interp
+                (s "no such widget ")
+                (part
+                  (name parent_name)))))
+          (return)))
+      (if
+        (bin and
+          (bin !=
+            (field kind
+              (index
+                (name widgets)
+                (name p)))
+            (field Window
+              (name Kind)))
+          (bin !=
+            (field kind
+              (index
+                (name widgets)
+                (name p)))
+            (field Panel
+              (name Kind))))
+        (block
+          (call
+            (name error)
+            (named text
+              (interp
+                (part
+                  (name parent_name))
+                (s " cannot have children"))))
+          (return)))
+      (let kind
+        (mcall parse
+          (name Kind)
+          (named text
+            (name kind_name))))
+      (if
+        (bin or
+          (bin ==
+            (name kind)
+            (none))
+          (bin ==
+            (name kind)
+            (field Window
+              (name Kind))))
+        (block
+          (call
+            (name error)
+            (named text
+              (interp
+                (s "unknown kind ")
+                (part
+                  (name kind_name)))))
+          (return)))
+      (if
+        (bin !=
+          (call
+            (name find_widget)
+            (named name
+              (name name)))
+          (none))
+        (block
+          (call
+            (name error)
+            (named text
+              (interp
+                (s "name ")
+                (part
+                  (name name))
+                (s " already exists"))))
+          (return)))
+      (if
+        (bin and
+          (bin ==
+            (name kind)
+            (field Image
+              (name Kind)))
+          (bin ==
+            (name arg)
+            (none)))
+        (block
+          (call
+            (name error)
+            (named text
+              (interp
+                (s "image ")
+                (part
+                  (name name))
+                (s " needs a file name"))))
+          (return)))
+      (call
+        (name new_widget)
+        (named parent
+          (name p))
+        (named kind
+          (name kind))
+        (named name
+          (name name))
+        (named arg
+          (bin ??
+            (name arg)
+            (str ""))))
+      (call
+        (name print)
+        (named text
+          (interp
+            (s "added ")
+            (part
+              (name kind_name))
+            (s " ")
+            (part
+              (name name))
+            (s " to ")
+            (part
+              (name parent_name)))))))
+  (fn cmd_on fails
+    (param name
+      (t Str))
+    (param action
+      (t Str))
+    (param arg
+      (t Optional
+        (t Str)))
+    (block
+      (let b
+        (call
+          (name find_widget)
+          (named name
+            (name name))))
+      (if
+        (bin ==
+          (name b)
+          (none))
+        (block
+          (call
+            (name error)
+            (named text
+              (interp
+                (s "no such widget ")
+                (part
+                  (name name)))))
+          (return)))
+      (if
+        (bin !=
+          (field kind
+            (index
+              (name widgets)
+              (name b)))
+          (field Button
+            (name Kind)))
+        (block
+          (call
+            (name error)
+            (named text
+              (interp
+                (part
+                  (name name))
+                (s " is not a button"))))
+          (return)))
+      (let cb
+        (match
+          (name action)
+          (arm
+            (plit
+              (str "inc"))
+            (call
+              (name inc_click)))
+          (arm
+            (plit
+              (str "close"))
+            (call
+              (name close_click)))
+          (arm
+            (plit
+              (str "open"))
+            (block
+              (let a
+                (try
+                  (call
+                    (name need)
+                    (named a
+                      (name arg))
+                    (named what
+                      (str "open")))))
+              (call
+                (name open_click)
+                (named window_name
+                  (name a)))))
+          (arm
+            (plit
+              (str "unsub"))
+            (block
+              (let a
+                (try
+                  (call
+                    (name need)
+                    (named a
+                      (name arg))
+                    (named what
+                      (str "unsub")))))
+              (let l
+                (try
+                  (call
+                    (name find_label)
+                    (named name
+                      (name a)))))
+              (call
+                (name unsub_click)
+                (named target
+                  (name l))
+                (named label_name
+                  (name a)))))
+          (arm
+            (pwild)
+            (fail
+              (interp
+                (s "unknown action ")
+                (part
+                  (name action)))))))
+      (iflet old
+        (field on_click
+          (index
+            (name widgets)
+            (name b)))
+        (block
+          (call
+            (name print)
+            (named text
+              (interp
+                (s "  replaced callback '")
+                (part
+                  (field action
+                    (name old)))
+                (s "'"))))))
+      (assign
+        (field on_click
+          (index
+            (name widgets)
+            (name b)))
+        (call
+          (name some)
+          (named value
+            (name cb))))
+      (call
+        (name print)
+        (named text
+          (interp
+            (part
+              (name name))
+            (s ".on_click = ")
+            (part
+              (name action)))))))
+  (fn cmd_click
+    (param name
+      (t Str))
+    (block
+      (let h
+        (call
+          (name find_widget)
+          (named name
+            (name name))))
+      (if
+        (bin ==
+          (name h)
+          (none))
+        (block
+          (call
+            (name error)
+            (named text
+              (interp
+                (s "no such widget ")
+                (part
+                  (name name)))))
+          (return)))
+      (iflet b
+        (mcall get
+          (name widgets)
+          (named handle
+            (name h)))
+        (block
+          (if
+            (bin !=
+              (field kind
+                (name b))
+              (field Button
+                (name Kind)))
+            (block
+              (call
+                (name error)
+                (named text
+                  (interp
+                    (part
+                      (name name))
+                    (s " is not a button")))))
+            (else
+              (iflet cb
+                (field on_click
+                  (name b))
+                (block
+                  (mcall run
+                    (name cb)
+                    (named me
+                      (name h)))
+                  (call
+                    (name print)
+                    (named text
+                      (bin +
+                        (interp
+                          (s "click ")
+                          (part
+                            (field name
+                              (name b)))
+                          (s " done"))
+                        (if
+                          (mcall has
+                            (name widgets)
+                            (named handle
+                              (name h)))
+                          (block
+                            (str ""))
+                          (else
+                            (block
+                              (str " (button removed itself)"))))))))
+                (else
+                  (block
+                    (call
+                      (name print)
+                      (named text
+                        (interp
+                          (s "click ")
+                          (part
+                            (field name
+                              (name b)))
+                          (s ": no callback")))))))))))))
+  (fn cmd_remove
+    (param name
+      (t Str))
+    (block
+      (let h
+        (call
+          (name find_widget)
+          (named name
+            (name name))))
+      (if
+        (bin ==
+          (name h)
+          (none))
+        (block
+          (call
+            (name error)
+            (named text
+              (interp
+                (s "no such widget ")
+                (part
+                  (name name)))))
+          (return)))
+      (call
+        (name remove_widget)
+        (named h
+          (name h)))
+      (call
+        (name print)
+        (named text
+          (interp
+            (s "removed ")
+            (part
+              (name name)))))))
+  (fn print_tree
+    (param h
+      (t Handle
+        (t Widget)))
+    (param depth
+      (t Int))
+    (block
+      (iflet w
+        (mcall get
+          (name widgets)
+          (named handle
+            (name h)))
+        (block
+          (var line
+            (interp
+              (part
+                (call
+                  (name indent)
+                  (named levels
+                    (name depth))))
+              (part
+                (field kind
+                  (name w)))
+              (s " ")
+              (part
+                (field name
+                  (name w)))))
+          (if
+            (bin ==
+              (field kind
+                (name w))
+              (field Label
+                (name Kind)))
+            (block
+              (opassign +
+                (name line)
+                (bin +
+                  (interp
+                    (s " \"")
+                    (part
+                      (field text
+                        (name w)))
+                    (s "\""))
+                  (if
+                    (mcall has
+                      (name subs)
+                      (named handle
+                        (field sub
+                          (name w))))
+                    (block
+                      (str " [subscribed]"))
+                    (else
+                      (block
+                        (str ""))))))))
+          (if
+            (bin ==
+              (field kind
+                (name w))
+              (field Image
+                (name Kind)))
+            (block
+              (opassign +
+                (name line)
+                (interp
+                  (s " ")
+                  (part
+                    (field text
+                      (name w)))))))
+          (iflet oc
+            (field on_click
+              (name w))
+            (block
+              (opassign +
+                (name line)
+                (interp
+                  (s " [on:")
+                  (part
+                    (field action
+                      (name oc)))
+                  (s " ")
+                  (part
+                    (field arg
+                      (name oc)))
+                  (s "]")))))
+          (call
+            (name print)
+            (named text
+              (name line)))
+          (for
+            (pbind k)
+            (field kids
+              (name w))
+            (block
+              (call
+                (name print_tree)
+                (named h
+                  (name k))
+                (named depth
+                  (bin +
+                    (name depth)
+                    (int 1)))))))
+        (else
+          (block
+            (call
+              (name print)
+              (named text
+                (interp
+                  (part
+                    (call
+                      (name indent)
+                      (named levels
+                        (name depth))))
+                  (s "(stale child)")))))))))
+  (fn cmd_tree
+    (block
+      (if
+        (mcall is_empty
+          (name windows))
+        (block
+          (call
+            (name print)
+            (named text
+              (str "(no windows)")))))
+      (for
+        (pbind h)
+        (name windows)
+        (block
+          (call
+            (name print_tree)
+            (named h
+              (name h))
+            (named depth
+              (int 0)))))))
+  (fn cmd_stats
+    (block
+      (call
+        (name print)
+        (named text
+          (interp
+            (s "stats: widgets=")
+            (part
+              (mcall len
+                (name widgets)))
+            (s " subscribers=")
+            (part
+              (mcall len
+                (name subs)))
+            (s " cache=")
+            (part
+              (mcall len
+                (name cache)))
+            (s " count=")
+            (part
+              (name count)))))))
+  (fn main
+    (block
+      (for
+        (pbind line)
+        (mcall lines
+          (name stdin))
+        (block
+          (if
+            (bin or
+              (mcall starts_with
+                (name line)
+                (named prefix
+                  (str "#")))
+              (mcall is_blank
+                (name line)))
+            (block
+              (continue)))
+          (call
+            (name print)
+            (named text
+              (interp
+                (s "> ")
+                (part
+                  (name line)))))
+          (let t
+            (mcall split
+              (name line)
+              (named sep
+                (str " "))))
+          (match
+            (index
+              (name t)
+              (int 0))
+            (arm
+              (plit
+                (str "window"))
+              (call
+                (name cmd_window)
+                (named name
+                  (index
+                    (name t)
+                    (int 1)))))
+            (arm
+              (plit
+                (str "add"))
+              (call
+                (name cmd_add)
+                (named parent_name
+                  (index
+                    (name t)
+                    (int 1)))
+                (named kind_name
+                  (index
+                    (name t)
+                    (int 2)))
+                (named name
+                  (index
+                    (name t)
+                    (int 3)))
+                (named arg
+                  (mcall get
+                    (name t)
+                    (named at
+                      (int 4))))))
+            (arm
+              (plit
+                (str "on"))
+              (block
+                (try-or e
+                  (call
+                    (name cmd_on)
+                    (named name
+                      (index
+                        (name t)
+                        (int 1)))
+                    (named action
+                      (index
+                        (name t)
+                        (int 2)))
+                    (named arg
+                      (mcall get
+                        (name t)
+                        (named at
+                          (int 3)))))
+                  (block
+                    (call
+                      (name error)
+                      (named text
+                        (interp
+                          (part
+                            (name e)))))))))
+            (arm
+              (plit
+                (str "click"))
+              (call
+                (name cmd_click)
+                (named name
+                  (index
+                    (name t)
+                    (int 1)))))
+            (arm
+              (plit
+                (str "remove"))
+              (call
+                (name cmd_remove)
+                (named name
+                  (index
+                    (name t)
+                    (int 1)))))
+            (arm
+              (plit
+                (str "tree"))
+              (call
+                (name cmd_tree)))
+            (arm
+              (plit
+                (str "stats"))
+              (call
+                (name cmd_stats)))
+            (arm
+              (pwild)
+              (call
+                (name error)
+                (named text
+                  (interp
+                    (s "unknown command ")
+                    (part
+                      (index
+                        (name t)
+                        (int 0)))))))))))))

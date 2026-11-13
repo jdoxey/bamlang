@@ -1,0 +1,1088 @@
+(file
+  (module core
+    (iface Shape
+      (is show)
+      (fn area
+        (recv self)
+        (ret
+          (t Float)))
+      (fn name
+        (recv self)
+        (ret
+          (t Str)))
+      (fn describe
+        (recv self)
+        (ret
+          (t Str))
+        (block
+          (return
+            (interp
+              (part
+                (mcall name
+                  (name self)))
+              (s " ")
+              (partf ".2"
+                (mcall area
+                  (name self)))))))
+      (fn intersects
+        (recv self)
+        (param other
+          (dyn Shape))
+        (ret
+          (t Bool))
+        (block
+          (return
+            (bin >
+              (bin +
+                (mcall sqrt
+                  (mcall area
+                    (name self)))
+                (mcall sqrt
+                  (mcall area
+                    (name other))))
+              (float 5.0))))))
+    (type Circle
+      (field r
+        (t Float))
+      (fn new pub fails
+        (param r
+          (t Float))
+        (ret
+          (t Circle))
+        (block
+          (if
+            (bin <=
+              (name r)
+              (float 0.0))
+            (block
+              (fail
+                (interp
+                  (s "bad radius ")
+                  (part
+                    (name r))))))
+          (return
+            (call
+              (name Circle)
+              (named r
+                (name r))))))
+      (fn area
+        (recv self)
+        (ret
+          (t Float))
+        (block
+          (return
+            (bin *
+              (bin *
+                (name PI)
+                (field r
+                  (name self)))
+              (field r
+                (name self))))))
+      (fn name
+        (recv self)
+        (ret
+          (t Str))
+        (block
+          (return
+            (str "circle")))))
+    (type Rect
+      (field w
+        (t Float))
+      (field h
+        (t Float))
+      (fn new pub fails
+        (param w
+          (t Float))
+        (param h
+          (t Float))
+        (ret
+          (t Rect))
+        (block
+          (if
+            (bin or
+              (bin <=
+                (name w)
+                (float 0.0))
+              (bin <=
+                (name h)
+                (float 0.0)))
+            (block
+              (fail
+                (interp
+                  (s "bad size ")
+                  (part
+                    (name w))
+                  (s "x")
+                  (part
+                    (name h))))))
+          (return
+            (call
+              (name Rect)
+              (named w
+                (name w))
+              (named h
+                (name h))))))
+      (fn area
+        (recv self)
+        (ret
+          (t Float))
+        (block
+          (return
+            (bin *
+              (field w
+                (name self))
+              (field h
+                (name self))))))
+      (fn name
+        (recv self)
+        (ret
+          (t Str))
+        (block
+          (return
+            (str "rect")))))
+    (impl Shape Circle)
+    (impl Shape Rect)
+    (enum Event pub
+      (variant Click)
+      (variant Drag
+        (vfield dx
+          (t Int)))
+      (variant Close))
+    (const FOCUS
+      (str "focus moves to next"))
+    (iface WidgetKind
+      (fn render
+        (recv self)
+        (param depth
+          (t Int))
+        (ret
+          (t Str)))
+      (fn event
+        (recv mut)
+        (param path
+          (t List
+            (t Int)))
+        (param ev
+          (t Event))
+        (ret
+          (t Str)))
+      (fn close
+        (recv take)
+        (ret
+          (t Str)))
+      (fn focus_next
+        (recv self)
+        (ret
+          (t Str))
+        (block
+          (return
+            (name FOCUS)))))
+    (fn route pub
+      (param children mut
+        (t List
+          (t Widget)))
+      (param path
+        (t List
+          (t Int)))
+      (param ev
+        (t Event))
+      (ret
+        (t Str))
+      (block
+        (match
+          (tuple
+            (name path)
+            (name ev))
+          (arm
+            (ptuple
+              (plist)
+              (pwild))
+            (return
+              (str "ignored")))
+          (arm
+            (ptuple
+              (plist
+                (pbind i))
+              (pvariant Close))
+            (guard
+              (bin <
+                (name i)
+                (mcall len
+                  (name children))))
+            (block
+              (let c
+                (mcall take_out
+                  (name children)
+                  (named at
+                    (name i))))
+              (return
+                (interp
+                  (s "consumed ")
+                  (part
+                    (mcall close
+                      (name c)))
+                  (s "; ")
+                  (part
+                    (name FOCUS))))))
+          (arm
+            (ptuple
+              (plist
+                (pbind i)
+                (prest rest))
+              (pwild))
+            (return
+              (match
+                (mcall get_mut
+                  (name children)
+                  (named at
+                    (name i)))
+                (arm
+                  (pvariant some
+                    (pbind c))
+                  (mcall event
+                    (name c)
+                    (named path
+                      (name rest))
+                    (named ev
+                      (name ev))))
+                (arm
+                  (plit
+                    (none))
+                  (str "no such widget")))))
+          (arm
+            (pwild)
+            (return
+              (str "ignored"))))))
+    (enum Widget pub
+      (variant Panel
+        (vfield children
+          (t List
+            (t Widget))))
+      (variant Button
+        (vfield label
+          (t Str)))
+      (variant Ext
+        (vfield widget
+          (dyn WidgetKind)))
+      (fn panel pub
+        (param children
+          (t List
+            (t Widget)))
+        (ret
+          (t Widget))
+        (block
+          (return
+            (call
+              (name Panel)
+              (named children
+                (name children))))))
+      (fn button pub fails
+        (param label
+          (t Str))
+        (ret
+          (t Widget))
+        (block
+          (if
+            (bin ==
+              (name label)
+              (str ""))
+            (block
+              (fail
+                (str "empty label"))))
+          (return
+            (call
+              (name Button)
+              (named label
+                (name label))))))
+      (fn render
+        (recv self)
+        (param depth
+          (t Int))
+        (ret
+          (t Str))
+        (block
+          (match
+            (name self)
+            (arm
+              (pvariant Panel
+                (pbind children))
+              (block
+                (var out
+                  (interp
+                    (part
+                      (call
+                        (name indent)
+                        (named levels
+                          (name depth))))
+                    (s "Panel\n")))
+                (for
+                  (pbind c)
+                  (name children)
+                  (block
+                    (opassign +
+                      (name out)
+                      (mcall render
+                        (name c)
+                        (named depth
+                          (bin +
+                            (name depth)
+                            (int 1)))))))
+                (return
+                  (name out))))
+            (arm
+              (pvariant Button
+                (pbind label))
+              (return
+                (interp
+                  (part
+                    (call
+                      (name indent)
+                      (named levels
+                        (name depth))))
+                  (s "Button ")
+                  (part
+                    (name label))
+                  (s "\n"))))
+            (arm
+              (pvariant Ext
+                (pbind d))
+              (return
+                (mcall render
+                  (name d)
+                  (named depth
+                    (name depth))))))))
+      (fn event
+        (recv mut)
+        (param path
+          (t List
+            (t Int)))
+        (param ev
+          (t Event))
+        (ret
+          (t Str))
+        (block
+          (match
+            (name self)
+            (arm
+              (pvariant Panel
+                (pbind children))
+              (return
+                (call
+                  (name route)
+                  (named children
+                    (name children))
+                  (named path
+                    (name path))
+                  (named ev
+                    (name ev)))))
+            (arm
+              (pvariant Button
+                (pbind label))
+              (match
+                (name ev)
+                (arm
+                  (pvariant Click)
+                  (return
+                    (interp
+                      (s "pressed ")
+                      (part
+                        (name label))
+                      (s "; ")
+                      (part
+                        (name FOCUS)))))
+                (arm
+                  (pwild)
+                  (return
+                    (str "ignored")))))
+            (arm
+              (pvariant Ext
+                (pbind d))
+              (return
+                (mcall event
+                  (name d)
+                  (named path
+                    (name path))
+                  (named ev
+                    (name ev))))))))
+      (fn collapse
+        (recv mut)
+        (block
+          (match
+            (name self)
+            (arm
+              (pvariant Panel
+                (pbind children))
+              (block
+                (let n
+                  (mcall len
+                    (name children)))
+                (assign
+                  (name self)
+                  (call
+                    (name Button)
+                    (named label
+                      (interp
+                        (s "panel of ")
+                        (part
+                          (name n))))))))
+            (arm
+              (pwild)
+              (block)))))
+      (fn close
+        (recv take)
+        (ret
+          (t Str))
+        (block
+          (match
+            (name self)
+            (arm
+              (pvariant Panel
+                (pbind children))
+              (return
+                (interp
+                  (s "Panel[")
+                  (part
+                    (mcall join
+                      (mcall map
+                        (name children)
+                        (named each
+                          (lambda
+                            (param c)
+                            (block
+                              (mcall close
+                                (name c))))))
+                      (named sep
+                        (str ", "))))
+                  (s "]"))))
+            (arm
+              (pvariant Button
+                (pbind label))
+              (return
+                (interp
+                  (s "Button ")
+                  (part
+                    (name label)))))
+            (arm
+              (pvariant Ext
+                (pbind d))
+              (return
+                (mcall close
+                  (name d))))))))
+    (type Money
+      (field cents
+        (t Int))
+      (fn new pub fails
+        (param cents
+          (t Int))
+        (ret
+          (t Money))
+        (block
+          (if
+            (bin <
+              (name cents)
+              (int 0))
+            (block
+              (fail
+                (interp
+                  (s "negative money ")
+                  (part
+                    (name cents))))))
+          (return
+            (call
+              (name Money)
+              (named cents
+                (name cents))))))
+      (fn cents pub
+        (recv self)
+        (ret
+          (t Int))
+        (block
+          (return
+            (field cents
+              (name self)))))
+      (fn plus pub
+        (recv self)
+        (param o
+          (t Money))
+        (ret
+          (t Money))
+        (block
+          (return
+            (call
+              (name Money)
+              (named cents
+                (bin +
+                  (field cents
+                    (name self))
+                  (field cents
+                    (name o))))))))
+      (fn minus pub
+        (recv self)
+        (param o
+          (t Money))
+        (ret
+          (t Optional
+            (t Money)))
+        (block
+          (if
+            (bin >
+              (field cents
+                (name o))
+              (field cents
+                (name self)))
+            (block
+              (return
+                (none))))
+          (return
+            (call
+              (name some)
+              (named value
+                (call
+                  (name Money)
+                  (named cents
+                    (bin -
+                      (field cents
+                        (name self))
+                      (field cents
+                        (name o)))))))))))
+    (type Account
+      (field owner
+        (t Str))
+      (field balance
+        (t Money))
+      (fn new pub fails
+        (param owner
+          (t Str))
+        (param balance
+          (t Money))
+        (ret
+          (t Account))
+        (block
+          (if
+            (bin ==
+              (name owner)
+              (str ""))
+            (block
+              (fail
+                (str "empty owner"))))
+          (return
+            (call
+              (name Account)
+              (named owner
+                (name owner))
+              (named balance
+                (name balance))))))
+      (fn deposit pub
+        (recv mut)
+        (param m
+          (t Money))
+        (block
+          (assign
+            (field balance
+              (name self))
+            (mcall plus
+              (field balance
+                (name self))
+              (named o
+                (name m))))))
+      (fn withdraw pub fails
+        (recv mut)
+        (param m
+          (t Money))
+        (block
+          (match
+            (mcall minus
+              (field balance
+                (name self))
+              (named o
+                (name m)))
+            (arm
+              (pvariant some
+                (pbind b))
+              (block
+                (assign
+                  (field balance
+                    (name self))
+                  (name b))))
+            (arm
+              (plit
+                (none))
+              (fail
+                (interp
+                  (s "insufficient funds: balance ")
+                  (part
+                    (mcall cents
+                      (field balance
+                        (name self))))
+                  (s ", need ")
+                  (part
+                    (mcall cents
+                      (name m))))))))))
+    (fn transfer pub fails
+      (param pool mut
+        (t Pool
+          (t Account)))
+      (param a
+        (t Handle
+          (t Account)))
+      (param b
+        (t Handle
+          (t Account)))
+      (param m
+        (t Money))
+      (block
+        (with src
+          (index
+            (name pool)
+            (name a))
+          (block
+            (try
+              (mcall withdraw
+                (name src)
+                (named m
+                  (name m))))))
+        (with dst
+          (index
+            (name pool)
+            (name b))
+          (block
+            (mcall deposit
+              (name dst)
+              (named m
+                (name m))))))))
+  (module plugin
+    (use core.Shape)
+    (use core.WidgetKind)
+    (use core.Widget)
+    (type Hexagon
+      (field side
+        (t Float))
+      (fn new pub fails
+        (param side
+          (t Float))
+        (ret
+          (t Hexagon))
+        (block
+          (if
+            (bin <=
+              (name side)
+              (float 0.0))
+            (block
+              (fail
+                (interp
+                  (s "bad side ")
+                  (part
+                    (name side))))))
+          (return
+            (call
+              (name Hexagon)
+              (named side
+                (name side))))))
+      (fn area
+        (recv self)
+        (ret
+          (t Float))
+        (block
+          (return
+            (bin *
+              (bin *
+                (bin /
+                  (bin *
+                    (float 3.0)
+                    (mcall sqrt
+                      (float 3.0)))
+                  (float 2.0))
+                (field side
+                  (name self)))
+              (field side
+                (name self))))))
+      (fn name
+        (recv self)
+        (ret
+          (t Str))
+        (block
+          (return
+            (str "hexagon"))))
+      (fn grow
+        (recv mut)
+        (param k
+          (t Float))
+        (block
+          (assign
+            (field side
+              (name self))
+            (bin *
+              (field side
+                (name self))
+              (name k))))))
+    (impl Shape Hexagon)
+    (type SliderSpec
+      (field value pub
+        (t Int))
+      (field max pub
+        (t Int)
+        (default
+          (int 10))))
+    (type Slider
+      (field value
+        (t Int))
+      (field max
+        (t Int))
+      (fn new pub fails
+        (param s
+          (t SliderSpec))
+        (ret
+          (t Slider))
+        (block
+          (if
+            (bin or
+              (bin <
+                (field value
+                  (name s))
+                (int 0))
+              (bin >
+                (field value
+                  (name s))
+                (field max
+                  (name s))))
+            (block
+              (fail
+                (str "slider out of range"))))
+          (return
+            (call
+              (name Slider)
+              (named value
+                (field value
+                  (name s)))
+              (named max
+                (field max
+                  (name s)))))))
+      (fn render
+        (recv self)
+        (param depth
+          (t Int))
+        (ret
+          (t Str))
+        (block
+          (return
+            (interp
+              (part
+                (call
+                  (name indent)
+                  (named levels
+                    (name depth))))
+              (s "Slider ")
+              (part
+                (field value
+                  (name self)))
+              (s "/")
+              (part
+                (field max
+                  (name self)))
+              (s "\n")))))
+      (fn event
+        (recv mut)
+        (param path
+          (t List
+            (t Int)))
+        (param ev
+          (t Event))
+        (ret
+          (t Str))
+        (block
+          (match
+            (name ev)
+            (arm
+              (pvariant Drag
+                (pbind d))
+              (block
+                (let old
+                  (field value
+                    (name self)))
+                (assign
+                  (field value
+                    (name self))
+                  (call
+                    (name clamp)
+                    (named value
+                      (bin +
+                        (name old)
+                        (name d)))
+                    (named low
+                      (int 0))
+                    (named high
+                      (field max
+                        (name self)))))
+                (return
+                  (interp
+                    (s "value ")
+                    (part
+                      (name old))
+                    (s " -> ")
+                    (part
+                      (field value
+                        (name self)))
+                    (s "; ")
+                    (part
+                      (mcall focus_next
+                        (name self)))))))
+            (arm
+              (pwild)
+              (return
+                (str "ignored"))))))
+      (fn close
+        (recv take)
+        (ret
+          (t Str))
+        (block
+          (return
+            (interp
+              (s "Slider ")
+              (part
+                (field value
+                  (name self)))
+              (s "/")
+              (part
+                (field max
+                  (name self))))))))
+    (impl WidgetKind Slider)
+    (type Tabs
+      (field children
+        (t List
+          (t Widget)))
+      (fn new pub fails
+        (param children
+          (t List
+            (t Widget)))
+        (ret
+          (t Tabs))
+        (block
+          (if
+            (mcall is_empty
+              (name children))
+            (block
+              (fail
+                (str "empty tabs"))))
+          (return
+            (call
+              (name Tabs)
+              (named children
+                (name children))))))
+      (fn render
+        (recv self)
+        (param depth
+          (t Int))
+        (ret
+          (t Str))
+        (block
+          (var out
+            (interp
+              (part
+                (call
+                  (name indent)
+                  (named levels
+                    (name depth))))
+              (s "Tabs\n")))
+          (for
+            (pbind c)
+            (field children
+              (name self))
+            (block
+              (opassign +
+                (name out)
+                (mcall render
+                  (name c)
+                  (named depth
+                    (bin +
+                      (name depth)
+                      (int 1)))))))
+          (return
+            (name out))))
+      (fn event
+        (recv mut)
+        (param path
+          (t List
+            (t Int)))
+        (param ev
+          (t Event))
+        (ret
+          (t Str))
+        (block
+          (return
+            (call
+              (name route)
+              (named children
+                (field children
+                  (name self)))
+              (named path
+                (name path))
+              (named ev
+                (name ev))))))
+      (fn close
+        (recv take)
+        (ret
+          (t Str))
+        (block
+          (return
+            (interp
+              (s "Tabs[")
+              (part
+                (mcall join
+                  (mcall map
+                    (field children
+                      (name self))
+                    (named each
+                      (lambda
+                        (param c)
+                        (block
+                          (mcall close
+                            (name c))))))
+                  (named sep
+                    (str ", "))))
+              (s "]"))))))
+    (impl WidgetKind Tabs))
+  (fn b1 fails
+    (block
+      (let c1
+        (try
+          (mcall new
+            (name Circle)
+            (named r
+              (float 1.0)))))
+      (let h1
+        (try
+          (mcall new
+            (name Hexagon)
+            (named side
+              (float 2.0)))))
+      (let r1
+        (try
+          (mcall new
+            (name Rect)
+            (named w
+              (float 2.0))
+            (named h
+              (float 3.0)))))
+      (let shapes
+        (t List
+          (dyn Shape))
+        (list
+          (name c1)
+          (name h1)
+          (name r1)))
+      (var total
+        (float 0.0))
+      (for
+        (pbind s)
+        (name shapes)
+        (block
+          (call
+            (name print)
+            (named text
+              (mcall describe
+                (name s))))
+          (opassign +
+            (name total)
+            (mcall area
+              (name s)))))
+      (call
+        (name print)
+        (named text
+          (interp
+            (s "total ")
+            (partf ".2"
+              (name total)))))
+      (call
+        (name eprint)
+        (named text
+          (interp
+            (part
+              (mcall intersects
+                (index
+                  (name shapes)
+                  (int 0))
+                (named other
+                  (index
+                    (name shapes)
+                    (int 1)))))
+            (s " ")
+            (part
+              (mcall show
+                (index
+                  (name shapes)
+                  (int 1)))))))))
+  (fn b2 fails
+    (block
+      (let cancel
+        (try
+          (mcall button
+            (name Widget)
+            (named label
+              (str "Cancel")))))
+      (let ok
+        (try
+          (mcall button
+            (name Widget)
+            (named label
+              (str "OK")))))
+      (let slider
+        (try
+          (mcall new
+            (name Slider)
+            (named s
+              (call
+                (name SliderSpec)
+                (named value
+                  (int 3)))))))
+      (let inner
+        (mcall panel
+          (name Widget)
+          (named children
+            (list
+              (name cancel)))))
+      (var root
+        (mcall panel
+          (name Widget)
+          (named children
+            (list
+              (name ok)
+              (mcall Ext
+                (name Widget)
+                (named widget
+                  (name slider)))
+              (name inner)))))
+      (call
+        (name print)
+        (named text
+          (str "build")))
+      (call
+        (name print)
+        (named text
+          (mcall render
+            (name root)
+            (named depth
+              (int 0)))))
+      (let x
+        (try
+          (mcall button
+            (name Widget)
+            (named label
+              (str "X")))))
+      (let tabs
+        (try
+          (mcall new
+            (name Tabs)
+            (named children
+              (list
+                (name x))))))
+      (var t
+        (mcall panel
+          (name Widget)
+          (named children
+            (list
+              (mcall Ext
+                (name Widget)
+                (named widget
+                  (name tabs)))))))
+      (mcall collapse
+        (name root)))))
