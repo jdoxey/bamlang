@@ -40,7 +40,13 @@ jobs:
           for t in clang clang-cl lld-link llvm-cov llvm-profdata llvm-pdbutil gdb lldb cdb ocamlopt rustc; do
             printf '%-14s %s\n' "$t" "$(command -v $t || echo missing)"
           done
-          ls "/c/Program Files/LLVM/bin" 2>/dev/null | head -40 || true
+          clang --version | head -2 || true
+          if [ "$RUNNER_OS" = macOS ]; then xcrun --find llvm-cov || true; xcrun --find llvm-profdata || true; fi
+          if [ "$RUNNER_OS" = Windows ]; then
+            ls "/c/Program Files (x86)/Windows Kits/10/Debuggers/x64" 2>/dev/null | head -20 || echo "no Debuggers dir"
+            llvm-objdump -p "/c/Program Files/LLVM/bin/liblldb.dll" 2>/dev/null | grep -i "DLL Name" || true
+            ls /c/hostedtoolcache/windows/Python 2>/dev/null || true
+          fi
       - name: Run checks
         shell: bash
         run: bash ci/run.sh

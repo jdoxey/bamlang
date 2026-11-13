@@ -7,6 +7,10 @@ S = {
     "K2 OCaml+LLVM IR": dict(debug=4.5, os3=2, agent=4.5, cov=3, trap=4, transp=3.5, effort=4, perf=5),
     # Rust + C: passes on all three OSes; C-level types in the debugger; llvm-cov maps to generated C; setjmp stack
     "K3 Rust+C": dict(debug=3.5, os3=5, agent=4, cov=3.5, trap=3, transp=5, effort=4.5, perf=4.5),
+    # after review-k1.md (Fable): F1 trap-in-drop bug (K1, K2), F2 Windows debugger unproven, F3 threads unproven, S1-S7
+    "K1 (review)": dict(debug=3.5, os3=4, agent=4, cov=3, trap=4, transp=3.5, effort=3, perf=5),
+    "K2 (review)": dict(debug=3.5, os3=3, agent=4.5, cov=3, trap=3.5, transp=3.5, effort=3.5, perf=5),
+    "K3 (review)": dict(debug=3, os3=4.5, agent=4, cov=3.5, trap=3.5, transp=5, effort=4, perf=4.5),
 }
 def total(s, w=W): return sum(s[k] * w[k] / 5 for k in w)
 for n, s in sorted(S.items(), key=lambda x: -total(x[1])): print(f"{total(s):5.1f}  {n}")
