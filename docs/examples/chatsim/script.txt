@@ -1,0 +1,37 @@
+# chatsim script. Every case in SPEC.md is hit; the case number is in the comment above it.
+join alice general
+# 20 re-entrancy: echobot sits between alice and bob, so its reply is broadcast mid-broadcast
+join echobot general
+join bob general
+say alice hello
+# 15 callback whose user is gone by the time it fires
+remind alice 3 stand up
+remind bob 1 drink water
+# 13 the rate limiter is shared by say, dm and reply (3 per user per tick)
+dm alice bob hi
+say bob one
+say bob two
+reply bob thanks
+say bob four
+# 4 ownership transfer: bob moves rooms
+move bob random
+tick 1
+say bob anyone here?
+# 11 back-references: alice's room and bob's last contact both point at alice
+leave alice
+# 14 references to a deleted user, held (reply) and looked up (dm)
+reply bob still there?
+dm bob alice hello?
+# 15 the reminder fires after alice left
+tick 2
+# 12 and 17 the last member leaves: general is freed even though members' callbacks captured them
+# 23 its history moves to the archive worker
+leave echobot
+# 26 general reopens while its archive may still be being written
+join carol general
+say carol fresh start
+# 25 stats reads counters the worker thread writes
+stats
+leave bob
+leave carol
+stats

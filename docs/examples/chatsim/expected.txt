@@ -1,0 +1,83 @@
+> join alice general
+#general opened
+alice joined #general
+> join echobot general
+echobot joined #general
+> join bob general
+bob joined #general
+> say alice hello
+#general alice: hello
+  echobot sees alice: hello
+#general echobot: echo: hello
+  alice sees echobot: echo: hello
+  bob sees echobot: echo: hello
+  bob sees alice: hello
+> remind alice 3 stand up
+reminder for alice set for tick 3
+> remind bob 1 drink water
+reminder for bob set for tick 1
+> dm alice bob hi
+dm alice -> bob: hi
+  bob sees dm from alice: hi
+> say bob one
+#general bob: one
+  alice sees bob: one
+  echobot sees bob: one
+#general echobot: echo: one
+  alice sees echobot: echo: one
+  bob sees echobot: echo: one
+> say bob two
+#general bob: two
+  alice sees bob: two
+  echobot sees bob: two
+#general echobot: echo: two
+  alice sees echobot: echo: two
+  bob sees echobot: echo: two
+> reply bob thanks
+dm bob -> alice: thanks
+  alice sees dm from bob: thanks
+> say bob four
+rate limited: bob
+> move bob random
+bob left #general
+#random opened
+bob joined #random
+> tick 1
+reminder for bob: drink water
+clock is 1
+> say bob anyone here?
+#random bob: anyone here?
+> leave alice
+alice left #general
+> reply bob still there?
+reply failed: bob's last contact has left
+> dm bob alice hello?
+dm failed: alice is not here
+> tick 2
+reminder for alice dropped: user has left
+clock is 3
+> leave echobot
+echobot left #general
+#general closed, 6 messages sent to archive
+> join carol general
+#general opened
+carol joined #general
+> say carol fresh start
+#general carol: fresh start
+> stats
+stats: users=2 rooms=2 messages=10 archived_rooms=1 archived_messages=6
+  archive general: 6 messages, 84 bytes
+  alive: users=2 rooms=2
+> leave bob
+bob left #random
+#random closed, 1 messages sent to archive
+> leave carol
+carol left #general
+#general closed, 1 messages sent to archive
+> stats
+stats: users=0 rooms=0 messages=10 archived_rooms=3 archived_messages=8
+  archive general: 6 messages, 84 bytes
+  archive random: 1 messages, 17 bytes
+  archive general: 1 messages, 18 bytes
+  alive: users=0 rooms=0
+exit: alive users=0 rooms=0
