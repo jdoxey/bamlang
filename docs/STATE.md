@@ -2,14 +2,14 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** writing `docs/PLAN.md` (milestones M0–M7), then D9 (modules, build, dependencies).
+- **Now:** D9, modules, build and dependencies (G7). `docs/PLAN.md` (M0–M7) is written.
 - **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes). Veto by opening an issue.
 - **Needs you:** nothing. Issue #3 answered (yes); your mitigations are in ADR-0002.
 
 ## Next action
 
-1. Write `docs/PLAN.md` (ROADMAP says: after D8). Turn M0–M7 into concrete milestones with exit tests, using ADR-0008's pipeline: parse, resolve, check, lowered IR, C emitter, runtime. M0 is the conformance harness over `docs/examples/syntax/p3n/` (append-only). Each milestone ends with tests running in CI on all three OSes.
-2. Then D9 (ADR-0009, Full): modules, build and dependencies (G7). Inputs:
+1. `docs/PLAN.md` is done.
+2. D9 (ADR-0009, Full): modules, build and dependencies (G7). Inputs:
    - ADR-0002: the generic dialect is allowed only in the stdlib and `extras`.
    - ADR-0005: whole-program `dyn` link check.
    - ADR-0008: clang is required. Decide whether to bundle clang and lld or require them per OS. FFI: traps never cross C frames, and extern declarations name every parameter (ADR-0006 amendment 1).
