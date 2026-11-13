@@ -2,19 +2,18 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** Phase 1 decisions, working down `docs/ROADMAP.md`. D2 (generics and containers) is next.
-- **Decided so far:** ADR-0001 Accepted: owned values, parameter-only borrows, pool handles; no reference counts. Memory safety is required (P3 yes).
+- **Now:** Phase 1 decisions, working down `docs/ROADMAP.md`. D3 (concurrency) is next.
+- **Decided so far:** ADR-0001 Accepted (memory), ADR-0002 Accepted (no user generics; G3 read as user-definable templates, vetoable): owned values, parameter-only borrows, pool handles; no reference counts. Memory safety is required (P3 yes).
 - **Needs you:** nothing. To steer or veto, open a GitHub issue.
 
 ## Next action
 
-Roadmap item **D2** (Full tier). Follow `docs/PROCESS.md`. Inputs: ADR-0001 needs built-in `List of T`, `Map of K,V`, `Pool of T`, `Handle of T`, `Optional of T`, `Mutex of T`. Decide whether built-in parameterised types satisfy G3 (P2) and whether users can write generic code. Use `docs/examples/chatsim/` as the example program.
+Roadmap item **D3** (Full tier). Follow `docs/PROCESS.md`. Inputs: ADR-0001 (values move between threads over channels, pools behind `Mutex of T`, handles sendable), ADR-0002 (`Channel of T`, `Mutex of T` are built-ins). Use chatsim's archive worker as the example (cases 23, 25, 26).
 
 Then continue down `docs/ROADMAP.md`.
 
 ## Open questions
 
-- **P2, built-in generic containers under G3:** decide in D2.
 - **Q15, is G11 syntax only:** decide in D7. Assume syntax only for v1.
 - ADR-0001 re-open trigger: two real programs needing a user-built refcount layer.
 
@@ -26,3 +25,4 @@ Then continue down `docs/ROADMAP.md`.
 
 - 2026-11-13: repo set up from the planning conversation.
 - 2026-11-13: D1 done. chatsim in C plus three models; ADR-0001 Accepted (O9+).
+- 2026-11-13: D2 done. ADR-0002 Accepted.

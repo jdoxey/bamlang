@@ -5,7 +5,7 @@ Work top to bottom. Tick an item when its ADR is Accepted or its milestone passe
 ## Phase 1: decisions
 
 - [x] **D1 Memory model** (ADR-0001, Full). Accepted: owned values + borrows + pool handles (O9+).
-- [ ] **D2 Generics and containers** (Full). How typed `List`/`Map` exist under G3. Is memory safety a stated goal?
+- [x] **D2 Generics and containers** (Full). Accepted: closed set of built-in parameterised types, no user generics (ADR-0002).
 - [ ] **D3 Concurrency model** (Full). Threads are in v1 (R1). What crosses threads, and how is shared state guarded?
 - [ ] **D4 Errors and absence** (Full). Exceptions, results or error values. Whether anything can be null.
 - [ ] **D5 Types and OO** (Full). Methods with implicit `self`, interfaces, and whether inheritance exists.
