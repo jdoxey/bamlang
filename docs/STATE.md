@@ -2,7 +2,7 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D2, generics and containers (how `List`, `Map`, `Pool` exist under G3). Research done; criteria and ideas next.
+- **Now:** D2, generics and containers (how `List`, `Map`, `Pool` exist under G3). Criteria and 11 ideas done; real examples of the top 3 next.
 - **Decided:** ADR-0001 memory model, Accepted: owned values, moves, explicit `.copy()`, and checked handles into pools. No reference counting, no `weak`. Veto by opening an issue.
 - **Needs you:** nothing. To steer or veto, open a GitHub issue.
 
@@ -30,7 +30,7 @@ Then continue down `docs/ROADMAP.md`.
 
 ## Blocked
 
-Nothing.
+- OCaml (an ML-inference model for D2 option I): `sudo apt install -y ocaml`. Modelled with Go generics instead.
 
 ## Log
 
