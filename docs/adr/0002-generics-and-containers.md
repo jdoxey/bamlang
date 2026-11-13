@@ -1,6 +1,6 @@
 # ADR-0002: Generics and containers
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Tier:** Full (see `docs/PROCESS.md`)
 - **Examples:** `docs/examples/generics` (A+ in `aplus/`; rivals in `a-closed-set/`, `c-interfaces/`, `i-inferred/`, `i-ocaml/`)
@@ -71,7 +71,8 @@ See `0002-research/lessons-and-scores.md` and each folder's `NOTES.md`.
   near-copy glue per key/value pair. A forgotten `delete` silently returned another entry's value: raw slot ids.
 - **A+** (C model honouring ADR-0001, plus pseudo-syntax, plus a Part 4 outside the stdlib):
   - The same mistake now takes a stale `else` or traps.
-  - The trap tests show S1, S5, S6 and F3 caught.
+  - The trap tests show S1, S5, S6, S7 and F3 caught.
+  - LRU glue stays about 31 lines per pair: the gain over A is safety, not size.
   - An event bus with a user sum type, and mixed widget kinds, work without type parameters.
 
 ## Decision
@@ -113,12 +114,24 @@ See `0002-research/lessons-and-scores.md` and each folder's `NOTES.md`.
 7. **`take` parameters.** A parameter that moves out of the caller is marked `take`, including in function types
    (`fn(take Event)`) and as `take self`. Built-in `push`, `insert` and `send` take.
 8. **Closures.**
-   - A closure escapes exactly when it is passed to a `take` parameter, returned or assigned. Then it captures by
-     move or copy, and a captured Copy variable it mutates counts as moved.
+   - A closure escapes exactly when it is passed to a `take` parameter, returned, or stored into a field, container
+     or module-level variable. Binding it to a local name is not escaping. An escaping closure captures by move or
+     copy, and a captured Copy variable it mutates counts as moved.
+   - Closure parameter types are inferred, but `take` on a closure parameter is always written.
    - A closure that doesn't escape acts as a nested function and borrows its captures per call, under exclusivity
      and the overlapping-argument check.
    - Stored closures share state by owning it, by holding an `Id` into a pool passed as an argument, or through
      module-level state.
+
+**Clarifications from the final example (`docs/examples/generics/aplus/NOTES.md`):**
+- Pools keep ADR-0001's per-entry borrows (segmented storage; `add` allowed while an entry is borrowed). The
+  whole-container block borrow applies to non-segmented containers (`List`, `Map` and so on).
+- `pool.remove(h)` drops the entry. `pool.take_out(h) -> Optional of T` moves it out. `List.remove_at(i)` returns the
+  value. D10 fixes the full API.
+- A one-operation place borrow counts as a borrow (uniform rule).
+- The borrow count costs a counter and a branch per structural mutation, in release builds too. That is stated, not
+  hidden.
+- The LRU's link between its order and its pool is kept by hand (the remaining glue).
 
 **Third-party libraries can't ship typed containers.** JSON or ORM mapping is written per struct until D10 decides a
 derived encode/decode to a built-in `Value`.

@@ -1,11 +1,11 @@
 // A+ benchmark for D2. ILLUSTRATIVE ONLY -- NOT A SYNTAX DECISION.
-// Pseudo-syntax: no semicolons, braces for blocks, `List of T`, `Map of K to V`, `Id`, `Ids`, `Table of T`.
+// Pseudo-syntax: no semicolons, braces for blocks, `List of T`, `Map of K to V`, `Pool of T`, `Handle of T`, `Id` (untyped handle).
 // Notation for ADR-0001's rules, in trailing comments:
 //   MOVE  ownership transfers; the source is dead      COPY  explicit .copy() or a value-form algorithm
 //   BORROW  lasts one call/statement (or one `if x =`/`with` block)      DROP  a value is freed here
-//   STALE  an `else` that exists only because an Id can be stale
-// Rule gaps this file had to assume are marked ASSUME and listed in NOTES.md.
-// A string literal creates a fresh owned Str (ASSUME). `take p: T` marks a parameter that is moved in (ASSUME).
+//   STALE  an `else` that exists only because a Handle or Id can be stale
+// Rule gaps that remain after the a-plus.md decisions are listed in NOTES.md.
+// A string literal creates a fresh owned Str; `take p: T` marks a parameter that is moved in (a-plus.md, decisions 1 and 4).
 
 // ================================================================ Part 1
 struct Employee { name: Str, dept: Str, salary: Int }
@@ -49,103 +49,97 @@ fn part1()
   // scope end: DROP names, rich, depts, groups, sorted, emps (reverse order)
 
 // ================================================================ Part 2
-// ----- the LRU logic, written ONCE, over Id. No key type, no value type. -----
-struct Lru { cap: Int, ids: Ids, order: List of Id }       // order: least recent first
+// ----- the LRU logic, written ONCE, over Id (the untyped handle). No key type, no value type. -----
+// The cache's storage is a Pool of Entry; Lru only orders the Ids that pool issued. Lru never touches the pool.
+struct Lru { cap: Int, order: List of Id }                 // order: least recent first
 
 fn Lru.new(cap: Int) -> Lru
-  return Lru { cap: cap, ids: Ids.new(), order: List.new() }
+  return Lru { cap: cap, order: List.new() }
 
 fn Lru.touch(self, id: Id)                                 // Id copies implicitly
   if i = self.order.index_of(id)
     self.order.remove_at(i)
   self.order.push(id)
 
-// Returns the Id for the new entry and, if the cache was full, the victim's old Id. The victim is
-// stale in `ids` from this call on; the caller removes the victim's data from its own Tables.
-fn Lru.acquire(self) -> (Id, Optional of Id)
-  if self.ids.count() < self.cap
-    id = self.ids.issue()
-    self.touch(id)
-    return (id, none)
-  victim = self.order[0]
-  id = self.ids.reissue(victim)                            // same slot, next generation
-  self.order.remove_at(0)
-  self.touch(id)
-  return (id, some(victim))
-// ----- end of generic LRU (17 lines, shared by every use) -----
+fn Lru.full(self) -> Bool
+  return self.order.len() >= self.cap
+
+fn Lru.pop_victim(self) -> Id                              // least recent; the caller removes its entry from the pool
+  return self.order.remove_at(0)                           // MOVE out (an Id: a copy)
+// ----- end of generic LRU (11 code lines, shared by every use) -----
 
 // ----- per-use glue 1: UserKey -> Profile -----
 struct UserKey { tenant: Int, id: Int }
 struct Profile { name: Str, email: Str }
+struct PEntry { key: UserKey, val: Profile }               // the key lives in the entry so eviction can find the Map key
 
-struct ProfileCache { lru: Lru, slots: Map of UserKey to Id, keys: Table of UserKey, vals: Table of Profile }
+struct ProfileCache { lru: Lru, slots: Map of UserKey to Handle of PEntry, pool: Pool of PEntry }
 
 fn ProfileCache.new(cap: Int) -> ProfileCache
-  return ProfileCache { lru: Lru.new(cap), slots: Map.new(), keys: Table.new(), vals: Table.new() }
+  return ProfileCache { lru: Lru.new(cap), slots: Map.new(), pool: Pool.new() }
 
 fn ProfileCache.get(self, k: UserKey) -> Optional of Profile
-  if id = self.slots.get(k)                                // BORROW; Id copies
-    if p = self.vals.get(id)                               // BORROW of self.vals
-      self.lru.touch(id)                                   // disjoint field from self.vals: allowed
-      return some(p.copy())                                // COPY: getters return copies
+  if h = self.slots.get(k)                                 // Handle is Copy: the binding copies, the Map borrow ends at once (S7)
+    if e = self.pool.get(h)                                // BORROW of self.pool
+      self.lru.touch(self.pool.id(h))                      // disjoint field from self.pool: allowed
+      return some(e.val.copy())                            // COPY: getters return copies
     else                                                   // STALE
       return none
   else
     return none
 
 fn ProfileCache.put(self, k: UserKey, take v: Profile) -> Optional of UserKey
-  if id = self.slots.get(k)
-    self.vals[id] = v                                      // place write: DROPs the old Profile, MOVEs v; traps if stale
-    self.lru.touch(id)
+  if h = self.slots.get(k)
+    self.pool[h].val = v                                   // place write: DROPs the old Profile, MOVEs v; traps if stale
+    self.lru.touch(self.pool.id(h))
     return none
-  (id, victim) = self.lru.acquire()
   evicted = none
-  if old = victim
-    if ok = self.keys.remove(old)                          // MOVEs the key out of the Table
-      self.slots.remove(ok)
-      evicted = some(ok)
+  if self.lru.full()
+    if vh = self.pool.handle(self.lru.pop_victim())        // foreign Id would trap; only staleness takes else
+      old = self.pool.remove(vh)                           // MOVEs the whole entry out
+      self.slots.remove(old.key)
+      evicted = some(old.key)                              // partial move; old.val DROPs at scope end
     else                                                   // STALE (unreachable here)
-      trap("lru victim has no key")
-    self.vals.remove(old)                                  // DROP the old Profile
-  self.keys.insert(id, k)                                  // UserKey is plain data: copies
-  self.vals.insert(id, v)                                  // MOVE
-  self.slots.insert(k, id)
+      trap("lru victim is not in the pool")
+  h = self.pool.add(PEntry { key: k, val: v })             // UserKey is plain data: copies; v MOVEs
+  self.slots.insert(k, h)
+  self.lru.touch(self.pool.id(h))
   return evicted
 // ----- end of glue 1 -----
 
 // ----- per-use glue 2: Str -> List of Int -----
-struct QueryCache { lru: Lru, slots: Map of Str to Id, keys: Table of Str, vals: Table of List of Int }
+struct QEntry { key: Str, val: List of Int }
+struct QueryCache { lru: Lru, slots: Map of Str to Handle of QEntry, pool: Pool of QEntry }
 
 fn QueryCache.new(cap: Int) -> QueryCache
-  return QueryCache { lru: Lru.new(cap), slots: Map.new(), keys: Table.new(), vals: Table.new() }
+  return QueryCache { lru: Lru.new(cap), slots: Map.new(), pool: Pool.new() }
 
 fn QueryCache.get(self, k: Str) -> Optional of List of Int
-  if id = self.slots.get(k)
-    if l = self.vals.get(id)
-      self.lru.touch(id)
-      return some(l.copy())                                // COPY: deep list copy
+  if h = self.slots.get(k)
+    if e = self.pool.get(h)
+      self.lru.touch(self.pool.id(h))
+      return some(e.val.copy())                            // COPY: deep list copy
     else                                                   // STALE
       return none
   else
     return none
 
-fn QueryCache.put(self, k: Str, take v: List of Int) -> Optional of Str
-  if id = self.slots.get(k)
-    self.vals[id] = v                                      // DROPs the old list, MOVEs v
-    self.lru.touch(id)
+fn QueryCache.put(self, take k: Str, take v: List of Int) -> Optional of Str
+  if h = self.slots.get(k)
+    self.pool[h].val = v                                   // DROPs the old list, MOVEs v
+    self.lru.touch(self.pool.id(h))
     return none
-  (id, victim) = self.lru.acquire()
   evicted = none
-  if old = victim
-    if ok = self.keys.remove(old)                          // MOVEs the key out
-      self.slots.remove(ok)
-      evicted = some(ok)                                   // MOVE to the caller
+  if self.lru.full()
+    if vh = self.pool.handle(self.lru.pop_victim())
+      old = self.pool.remove(vh)
+      self.slots.remove(old.key)
+      evicted = some(old.key)                              // MOVE to the caller
     else                                                   // STALE (unreachable here)
-      trap("lru victim has no key")
-    self.vals.remove(old)                                  // DROP
-  self.keys.insert(id, k.copy())                           // COPY: the Table owns one key ...
-  self.vals.insert(id, v)
-  self.slots.insert(k.copy(), id)                          // COPY: ... and the Map owns another
+      trap("lru victim is not in the pool")
+  h = self.pool.add(QEntry { key: k.copy(), val: v })      // COPY: the entry owns one key ...
+  self.slots.insert(k, h)                                  // ... and the Map owns the moved-in one
+  self.lru.touch(self.pool.id(h))
   return evicted
 // ----- end of glue 2 -----
 
@@ -153,7 +147,9 @@ fn part2()
   print("== Part 2: LRU cache reused for two key/value pairs ==")
   pc = ProfileCache.new(2)
   qc = QueryCache.new(3)
-  put_p = fn t, i, name, email ->
+  // Local helpers that never escape (not passed to a `take` parameter, returned or assigned elsewhere) act as
+  // nested functions (S2): each reaches `pc`/`qc` at call time, exclusivity checked per call. Both capture pc.
+  put_p = fn t, i, take name, take email ->      // closure parameters need `take` too: they are moved into the Profile
     print("profiles put {t}/{i}")
     if ev = pc.put(UserKey { tenant: t, id: i }, Profile { name: name, email: email })
       print("profiles evict {ev.tenant}/{ev.id}")
@@ -162,9 +158,9 @@ fn part2()
       print("profiles get {t}/{i} hit {p.name} <{p.email}>")
     else
       print("profiles get {t}/{i} miss")
-  put_q = fn k, vs ->
+  put_q = fn take k, take vs ->
     print("queries put {k}")
-    if ev = qc.put(k, vs)
+    if ev = qc.put(k, vs)                                  // MOVE both: the helper owns its arguments
       print("queries evict {ev}")
   get_q = fn k ->
     if v = qc.get(k)
@@ -189,10 +185,10 @@ fn part2()
   put_q("e", [5])
   get_q("c")
   get_q("a")
-  // The F3 check (review-a.md): if put forgot `self.slots.remove(ok)`, the Map would keep an Id to the
-  // evicted slot. get takes the STALE else (a miss); a later put of that key traps on `self.vals[id] = v`.
-  // Go option A returned another entry's value. Demonstrated by `aplus --f3` / `--f3-put` in c/aplus.c.
-  // scope end: DROP qc, pc (every Table, Map and List they own)
+  // F3 (review-a.md): if put forgot `self.slots.remove(old.key)`, the Map keeps a Handle to the removed slot.
+  // get takes the STALE else (a miss); a later put of that key traps on `self.pool[h].val = v`. Slots are reused
+  // with the next generation, so the dangling Handle never reads the new tenant. `aplus --f3` / `--f3-put`.
+  // scope end: DROP qc, pc (each Pool, Map and List they own)
 
 // ================================================================ Part 3
 struct Address { street: Str, city: Str }
@@ -220,7 +216,7 @@ fn part3()
         print("addr for {r.id}: none")
   )
   for id in 1..=3
-    addr = find_user(id).and_then(fn u -> u.addr)          // consumes the Optional; moves the field out (ASSUME: partial move)
+    addr = find_user(id).and_then(fn u -> u.addr)          // consumes the Optional; moves the field out (partial move, decision 4)
     tx.send(Reply { id: id, addr: addr })                  // MOVE
   tx.close()                                               // DROP of tx also closes
   worker.join()
@@ -229,12 +225,12 @@ fn part3()
 // 4a: an event bus. The user sum type is not templated.
 enum Event { Joined(name: Str), Left(name: Str), Message(from: Str, text: Str) }
 
-struct Stats { ids: Ids, counts: Table of Int }            // context handed to every subscriber
+struct Stats { counts: Pool of Int }                       // context handed to every subscriber
 
-// Subscribers are STORED, so they are escaping closures: they capture by MOVE or COPY, never by borrow.
-// They may not reach `stats` or any local by borrow; state they share with the program lives in an
-// Id-keyed Table that publish lends them as an argument.
-struct Bus { subs: List of fn(Event, Stats) }
+// Subscribers are STORED: `subscribe` has a `take` parameter, so a closure passed to it ESCAPES (S3) and captures
+// by MOVE or COPY, never by borrow. A Copy variable it mutates counts as MOVED into it (S4). State shared with the
+// program therefore lives in a Pool that publish lends as an argument; the closure holds a Handle (a Copy).
+struct Bus { subs: List of fn(Event, Stats) }              // `take` is part of the function type of subscribe
 
 fn Bus.new() -> Bus
   return Bus { subs: List.new() }
@@ -249,101 +245,102 @@ fn Bus.publish(self, take ev: Event, stats: Stats)         // `stats` is borrowe
 
 fn part4_bus()
   print("-- event bus --")
-  stats = Stats { ids: Ids.new(), counts: Table.new() }
-  counter = stats.ids.issue()
-  stats.counts.insert(counter, 0)
+  stats = Stats { counts: Pool.new() }
+  counter = stats.counts.add(0)                            // Handle of Int
   bus = Bus.new()
   bus.subscribe(fn ev, st ->                               // no captures
     match ev
       Joined(n) -> print("log: {n} joined")
       Left(n) -> print("log: {n} left")
       Message(f, t) -> print("log: {f} says {t}"))
-  bus.subscribe(fn ev, st ->                               // captures `counter` (an Id) by COPY
+  bus.subscribe(fn ev, st ->                               // captures `counter` (a Handle) by COPY
     match ev
-      Message(_, _) -> st.counts[counter] += 1             // place write through the borrowed Stats
+      Message(_, _) -> st.counts[counter] += 1             // place write through the borrowed Stats; traps if stale
       Joined(_) -> ()
       Left(_) -> ())
   prefix = "welcome"
   seen = 0
-  bus.subscribe(fn ev, st ->                               // owns its state: `prefix` MOVEd in, `seen` COPYed in
+  bus.subscribe(fn ev, st ->                               // owns its state: `prefix` and `seen` are MOVEd in
     match ev
       Joined(n) ->
-        seen += 1                                          // mutates the closure's own copy; invisible outside
+        seen += 1                                          // mutated captured Copy => `seen` is moved (S4)
         print("{prefix} #{seen} {n}")
       Left(_) -> ()
       Message(_, _) -> ())
-  // `prefix` is dead here (moved). `seen` is still 0 out here, and stays 0.
+  // `prefix` and `seen` are dead here. Reading `seen` is a use-after-move error (hint: "an escaping closure
+  // mutates `seen`, so it owns it; share it through a Pool and a Handle").
   bus.publish(Event.Joined("ann"), stats)
   bus.publish(Event.Joined("ben"), stats)
   bus.publish(Event.Message("ann", "hi"), stats)
   bus.publish(Event.Message("ben", "hello"), stats)
   bus.publish(Event.Left("ann"), stats)
   bus.publish(Event.Message("ben", "anyone?"), stats)
-  print("messages seen: {stats.counts[counter]}")          // BORROW, one statement
-  // What does NOT work (compile error, hint "a stored closure copies `n`; hold an Id into a Table instead"):
+  print("messages seen: {stats.counts[counter]}")         // BORROW, one statement
+  // What does NOT compile (S3, S4):
   //   n = 0
-  //   bus.subscribe(fn ev, st -> n += 1)                  // Bus.subscribe stores its argument: not call-length
-  // What WOULD work, because sort_by does not store its closure (non-escaping, so it may borrow n):
-  //   n = 0
-  //   emps.sort_by_fn(fn a, b -> { n += 1; a.salary < b.salary })     // n is borrowed mutably for the call
+  //   bus.subscribe(fn ev, st -> n += 1)                  // escapes; mutated Copy => n moved into the closure
+  //   print(n)                                            // error: use of moved `n`
+  // What WOULD work: emps.sort_by_fn(fn a, b -> { n += 1; a.salary < b.salary })  -- sort_by_fn's parameter is not
+  // `take`, so the closure is non-escaping and borrows n mutably for the call.
   // scope end: DROP bus (and each closure's captures), stats
 
-// 4b: mixed widget kinds through a record of functions.
+// 4b: mixed widget kinds. The closed set of kinds is a sum type of typed handles; no Id is needed.
 struct Button { label: Str, clicks: Int }
 struct Slider { value: Int, max: Int }
 struct LabelW { text: Str }
 
-// module-level (main-thread) state: a stored `fn(Id) -> Str` cannot borrow locals, so its Tables are module-level
-widget_ids: Ids = Ids.new()
-buttons: Table of Button = Table.new()
-sliders: Table of Slider = Table.new()
-labels: Table of LabelW = Table.new()
+enum Widget { Button(Handle of Button), Slider(Handle of Slider), Label(Handle of LabelW) }   // plain data; copies
 
-struct WidgetKind { name: Str, render: fn(Id) -> Str }
-struct Item { kind: Int, id: Id }                          // plain data; copies
+struct Ui { buttons: Pool of Button, sliders: Pool of Slider, labels: Pool of LabelW }
 
-fn render_button(id: Id) -> Str
-  return "[{buttons[id].label}] clicks={buttons[id].clicks}"   // BORROW per use; traps if stale
-fn render_slider(id: Id) -> Str
-  with s = sliders[id]
-    return "[{"#".repeat(s.value)}{".".repeat(s.max - s.value)}] {s.value}/{s.max}"
-fn render_label(id: Id) -> Str
-  return labels[id].text.copy()                            // COPY: render returns an owned Str
+fn Ui.add_button(self, items: List of Widget, label: Str) -> Handle of Button   // `items` borrowed mutably
+  h = self.buttons.add(Button { label: label.copy(), clicks: 0 })   // COPY: label is borrowed
+  items.push(Widget.Button(h))
+  return h
+fn Ui.add_slider(self, items: List of Widget, value: Int, max: Int) -> Handle of Slider
+  h = self.sliders.add(Slider { value: value, max: max })
+  items.push(Widget.Slider(h))
+  return h
+fn Ui.add_label(self, items: List of Widget, text: Str) -> Handle of LabelW
+  h = self.labels.add(LabelW { text: text.copy() })        // COPY
+  items.push(Widget.Label(h))
+  return h
 
-fn add_button(items: List of Item, label: Str) -> Id       // `items` borrowed mutably
-  id = widget_ids.issue()
-  buttons.insert(id, Button { label: label.copy(), clicks: 0 })   // COPY: label is borrowed
-  items.push(Item { kind: 0, id: id })
-  return id
-fn add_slider(items: List of Item, value: Int, max: Int) -> Id
-  id = widget_ids.issue()
-  sliders.insert(id, Slider { value: value, max: max })
-  items.push(Item { kind: 1, id: id })
-  return id
-fn add_label(items: List of Item, text: Str) -> Id
-  id = widget_ids.issue()
-  labels.insert(id, LabelW { text: text.copy() })          // COPY
-  items.push(Item { kind: 2, id: id })
-  return id
+fn Ui.name(self, w: Widget) -> Str
+  match w
+    Button(_) -> return "button"
+    Slider(_) -> return "slider"
+    Label(_) -> return "label"
+
+fn Ui.render(self, w: Widget) -> Str                       // exhaustive match: a new kind is a compile error here
+  match w
+    Button(h) -> return "[{self.buttons[h].label}] clicks={self.buttons[h].clicks}"   // BORROW per use; traps if stale
+    Slider(h) ->
+      with s = self.sliders[h]
+        return "[{"#".repeat(s.value)}{".".repeat(s.max - s.value)}] {s.value}/{s.max}"
+    Label(h) -> return self.labels[h].text.copy()          // COPY: render returns an owned Str
 
 fn part4_widgets()
   print("-- widgets --")
-  kinds = List.of(WidgetKind { name: "button", render: render_button },
-                  WidgetKind { name: "slider", render: render_slider },
-                  WidgetKind { name: "label", render: render_label })
-  items: List of Item = List.new()
-  ok = add_button(items, "OK")
-  add_slider(items, 0, 8)
-  add_label(items, "Hello")
-  add_button(items, "Cancel")
-  vol = add_slider(items, 4, 8)
-  buttons[ok].clicks += 1
-  buttons[ok].clicks += 1
-  sliders[vol].value = 8
-  sliders[items[1].id].value = 4
-  for it in items                                          // BORROW
-    print("{kinds[it.kind].name}: {kinds[it.kind].render(it.id)}")   // the returned Str is a temporary: DROPped at statement end
-  // scope end: DROP items, kinds
+  ui = Ui { buttons: Pool.new(), sliders: Pool.new(), labels: Pool.new() }
+  items: List of Widget = List.new()
+  ok = ui.add_button(items, "OK")
+  s0 = ui.add_slider(items, 0, 8)
+  ui.add_label(items, "Hello")
+  ui.add_button(items, "Cancel")
+  vol = ui.add_slider(items, 4, 8)
+  ui.buttons[ok].clicks += 1
+  ui.buttons[ok].clicks += 1
+  ui.sliders[vol].value = 8
+  ui.sliders[s0].value = 4
+  for w in items                                           // BORROW
+    print("{ui.name(w)}: {ui.render(w)}")                  // the returned Str is a temporary: DROPped at statement end
+  // scope end: DROP items, ui
+  // Dropped variant: a record of functions (`struct WidgetKind { name, render: fn(Id) -> Str }`) cannot be used
+  // here. A stored `fn(Id)` is an escaping closure and cannot borrow `ui`, so the pools would have to be module
+  // state and the `Id` would carry no type. For a CLOSED set of kinds the sum type is strictly shorter and checked
+  // for exhaustiveness. A record of functions only earns its place for an OPEN set of kinds (plugins), where each
+  // function owns its state; that is the 4a shape, not a second widget demo.
 
 fn part4()
   print("== Part 4 (A+ only): outside the stdlib ==")

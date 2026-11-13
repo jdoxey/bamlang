@@ -1,59 +1,59 @@
-# A+ example: NOTES (D2 loop 2)
+# A+ example: NOTES (D2 loop 2, rewritten to the A+ decisions in `a-plus.md` and `review-aplus.md`)
 
-Files: `aplus.txt` (pseudo-syntax, illustrative only), `c/aplus.c` (C model: built-ins section, then the program),
-`expected-aplus.txt` (= `../expected.txt` + Part 4). `c/run.sh` builds with `-Wall -Wextra -Werror`, diffs, and runs the F3
-checks. It also passes with `SANITIZE=1` (address+undefined) under gcc and clang on Linux.
+Files: `aplus.txt` (pseudo-syntax), `c/aplus.c` (C model), `expected-aplus.txt` (unchanged: `../expected.txt` + Part 4),
+`c/run.sh` (builds with `-std=c11 -Wall -Wextra -Werror -O1 -g`, diffs, runs the trap tests; passes with `SANITIZE=1`,
+address+undefined, gcc and clang on Linux; macOS and Windows not run by me).
 
-## Counts (aplus.txt, 357 lines; "code" = non-blank, non-comment)
+## Counts (aplus.txt, 355 lines; "code" = non-blank, non-comment)
 | Part | lines | code |
 |---|---|---|
 | 1 algorithms | 41 | 36 |
-| 2 LRU (incl. driver) | 145 | 119 |
+| 2 LRU (incl. driver) | 142 | 113 |
 | 3 Optional + thread | 31 | 26 |
-| 4 bus + widgets | 131 | 99 |
+| 4 bus + widgets | 132 | 94 |
 
-- `.copy()` calls: 13 (Part 1: 4, Part 2: 4, Part 3: 1, Part 4: 3 incl. `render_label`). `COPY` notes also mark value-form algorithms.
-- Explicit stale `else` branches: 4 (one per `get` x2, one per `put` victim-key lookup x2; the put ones are unreachable).
-- `with`: 2. `m[k]` / `t[id]` place uses: about 17 (groups, vals, counts, buttons, sliders).
-- LRU: generic part 17 code lines (Go option A: 22). Per-use glue: **32** (UserKey/Profile) and **30** (Str/List of Int),
-  Go option A: 31 and 31. **No saving**: the typed Tables replace the Go slices, but the nested `if id` / `if p` / `else`
-  and the `old = victim` lookup add what the slices removed. The gain is safety, not size.
-- Two `.copy()` of the key in `QueryCache.put`: the Table and the Map each need to own a key.
+- `.copy()`: 12 (Part 1: 4, Part 2: 3, Part 3: 1, Part 4: 3 incl. `Ui.render`). Was 13.
+- Stale `else` branches: 4 (2 in `get`, 2 for the eviction victim in `put`; the `put` ones are unreachable). Same as before.
+- `take` parameters: 9 (`put` x2 = 3, closure helpers `put_p`/`put_q` = 4, `subscribe`, `publish`). `with`: 2.
+- LRU generic part: **11 code lines** (was 17; Go option A: 22). Per-use glue: **32** (UserKey/Profile) and **30**
+  (Str/List of Int); before 32/30; Go option A 31/31. So **still no saving, no cost**. `Pool` replaced `Table`
+  and `Ids`: the `acquire` call and the key Table vanished, but the entry struct (3 lines), `pool.id(h)` (3 per use)
+  and the `pool.handle(...)` victim lookup took the same lines back. The gain is safety (foreign and stale are told apart).
+  The key is still stored twice (entry and Map); `QueryCache.put` now makes 1 copy of the key, not 2 (put takes `k`).
 
-## F3 (stale Id) in practice
-Both `c/aplus.c --f3` and `--f3-put` deliberately forget `slots.remove(old)`. Go option A returned another entry's value.
-Here: `get` finds the dangling Id, `vals.get(id)` is NULL, the stale `else` runs, output `profiles get 1/1 miss`.
-A later `put` of that key traps (`stale Id (index 0, generation 1) used on a Table`) at `vals[id] = v`.
-Both are checked by `run.sh`; neither shows in the Part 2 output, which has no such bug.
+## Trap tests run by `run.sh` (all: `TRAP: ...` on stdout, exit 70, no signals)
+- F3: forgotten `slots.remove` -> `get` misses via the stale `else`; `put` of that key traps (`stale Handle`).
+  Slots are reused with the next generation, so the dangling Handle never sees the new tenant.
+- S1: `with first = log[0] { note("b") }` where `note` (another function) pushes: traps. After the borrow, the push works.
+- S7: `with x = m[k] { m.remove(k) }` traps (a block borrow holds the whole Map; inserting a NEW key traps too).
+- S5: a foreign Id (`pool.handle`) and a foreign Handle (`pool[h]`) trap; a stale Id on its own pool returns "else".
+- S6: `m[k].push(m[j].pop())` and `m[k].push(grow(m))` (argument inserts a key) work with arguments first. The naive
+  order (place first, argument second) is shown to trap via S1: that is what the borrow count buys.
 
 ## Part 4
-- Bus: a stored subscriber cannot borrow, so shared state is an `Id` captured by copy, with its `Table` lent as an
-  argument (`Stats`) by `publish`. State that only the closure needs is owned by it (`seen`, `prefix`). The tempting
-  `bus.subscribe(fn -> n += 1)` copies `n`, so the caller's `n` stays 0: silently wrong unless the compiler warns.
-  **Recommendation:** error when a stored closure mutates a captured Copy variable that the outer scope later reads.
-- Widgets: `render: fn(Id) -> Str` cannot borrow, so its Tables are module-level (main-thread) state. 4a's context-passing
-  and 4b's module state are two different answers to one problem; the docs must teach both.
+- 4a: the counter lives in `Stats.counts: Pool of Int`, the subscriber holds a Handle (Copy). `seen` is mutated by an
+  escaping closure, so it is moved in (S4); reading it outside is a use-after-move error. The old "`n` stays 0" trap is gone.
+- 4b: `enum Widget { Button(Handle of Button), ... }` plus `match`. Shorter than the record of functions, exhaustive,
+  and the pools can be locals. **Record of functions dropped**: a stored `fn(Id)` escapes, so it cannot borrow the pools
+  (they would be module state) and the Id would be untyped. It only fits an open set of kinds, which 4a already shows.
 
-## Still awkward
-- Copy-returning getters: every `get` copies the Profile or List just to print it. A visitor (`get_with(k, fn p -> ...)`
-  with a non-escaping closure) avoids the copy but changes the shape of the API.
-- `Map` key plus `Table` key: the key lives twice. `keys` Table exists only so eviction can find the Map key.
-- The runtime borrow flags on Table entries (ADR rule 4) are not modelled in the C; `table_get` pointers are trusted.
-
+## Not modelled in the C
+Per-entry borrow flags on Pool entries (rule 5): only List and Map carry the borrow count. Pool ids are not atomic.
 ## Unclear or contradictory rules (critical)
-1. **Consuming parameters are undefined.** ADR rule 3 says parameters are borrowed for the call; rule 2 says passing into
-   storage moves. `put(k, v)` must take `v`. I invented `take v`. Needs a rule (D6).
-2. **Staleness is relative to what?** a-plus.md: "a stale `Id` takes `else` ... exactly as handles do". But `Ids` and
-   `Table` are separate objects, and a Table cannot hold a reference to its `Ids`. In my model a Table slot stores the
-   generation that wrote it, so an Id reissued by `Ids` still reads the OLD data until the new Id is inserted, and a stale
-   Id can be `insert`ed into an emptied slot. `Pool` (= `Ids` + `Table`) has no such window. Either Table must be created
-   from an `Ids` (a binding, not a stored borrow), or LRU-style code should use `Pool`-like pairing.
-3. **`Ids.reissue` is not in a-plus.md.** Without it a full cache needs `release` then `issue`, which may reuse any slot.
-   I added `reissue` (same slot, next generation). Specify it, or say what `release` recycles.
-4. **`if x = m.get(k)` binds a borrow for a block**, but ADR rule 3 says borrows last one call and rule 5 allows the block
-   form only for pools. a-plus.md extends it to Maps and Tables without saying so. Same for `Optional` fields (`if a = r.addr`).
-5. **String literals and partial moves** are unspecified. I assumed a literal is a fresh owned `Str`, and that
-   `fn u -> u.addr` may move one field out of an owned struct and drop the rest.
-6. **F5 leaves stored closures with no way to share state** except Id-in-Table, argument passing or module-level state.
-   That is workable but a-plus.md should say so, since "must own state or hold an Id" is not enough: the Id is useless
-   without the Table.
+1. **"Escapes exactly when ... assigned" (S3) contradicts S2.** `put_p = fn ...` is an assignment, yet the helper must
+   count as non-escaping. The rule must say "assigned to a field, global or `take` parameter", not to a local.
+2. **Closure parameters and `take`.** Decision 1 forbids inferring `take` from a body, but a closure's parameter types
+   are inferred. I wrote `fn take k, take vs ->`. Without it `Profile { name: name }` moves out of a borrowed parameter.
+3. **Block borrow of a Pool.** S7 says a block borrow holds the whole container; ADR-0001 rule 5 says `add` during a
+   borrow is fine and flags are per entry. In `get`, `self.lru.touch(self.pool.id(h))` runs inside `if e = self.pool.get(h)`,
+   which only works if the borrow is shared or per entry. Pick one for `Pool`.
+4. **`pool.remove(h)` returns the entry**, and `old.key` is then moved out of `old` (partial move, decision 4). Neither
+   the return type nor `remove_at` returning its element is written down.
+5. **Unreachable stale branches stay.** Because `pop_victim` already removed the Id from `order`, the victim can be stale
+   only if code removed pool entries behind the Lru's back (a `Cache.remove(k)` that forgot `lru.forget`). Then the right
+   answer is to try the next victim, not `trap`. The Lru has no `forget`, and no test exercises it. Invariants split
+   between `Lru.order` and `Pool` are by hand (the same hand-kept coupling the `Ids` design had).
+6. **Statement-length place borrows vs. the run-time count.** `m[k].push(e)` needs no count if nothing runs between place
+   and push; the C takes one only to show S6. The spec should say whether a place expression ever bumps the count.
+7. **The run-time borrow count is a cost on every container** (a counter and a branch per structural mutation, in
+   release too). Cheap, but the docs must state it. A mistake via a named path is a compile error, via a function a trap.
