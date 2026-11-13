@@ -12,3 +12,25 @@
 | F10 exclusivity | **Per field** (disjoint named paths), as ADR-0001 rule 4 says for named paths. |
 | F11 hidden costs | **State them:** stored closures heap-allocate their captures; built-in algorithms call the function value indirectly unless the optimiser inlines it. |
 | F2, F9 | The loop-2 example: the generics benchmark in a C model honouring ADR-0001, plus a Part 4 outside the stdlib. |
+
+## Decisions on the gaps the A+ example found (`docs/examples/generics/aplus/NOTES.md`)
+
+1. **Consuming parameters.** A parameter the function stores is declared `take` in the signature, so the caller can
+   read the move from the signature (R6). It isn't inferred from the body, because callers' compile results would then
+   change when the body changes. This is one keyword (D6 picks the spelling). It refines ADR-0001 rule 3.
+2. **`Ids` and `Table` are dropped,** because a `Table` separate from its issuer has a reuse window. Instead, `Id` is an
+   **untyped handle**:
+   - `pool.id(h)` erases the type;
+   - `pool.handle(id)` gives back `Handle of T`, checking pool id and generation (stale or foreign takes `else`);
+   - `pool[id]` traps.
+
+   Element-free user logic is written over `Id`s, and typed storage stays in `Pool`. A full cache reissues a slot with
+   `remove` plus `add`. There are fewer concepts than in the review's proposal.
+3. **Block borrows** (`if x = c.get(k) { … }`, `with x = c[k] { … }`) apply to every built-in container and to
+   `Optional`. The borrow lasts the block, under exclusivity. This extends ADR-0001 rule 5's pool form.
+4. **String literals** are fresh owned values. **Partial moves** out of an owned local are allowed, and the rest drops
+   at once. D4 and D6 give the detail.
+5. **Stored closures share state in one of three documented ways:** they own it, they hold an `Id` into a pool that is
+   passed as an argument, or they use module-level (main-thread) state.
+   - A stored closure that mutates a captured copy which the enclosing scope reads later is a **compile error**, which
+     catches the "`n` stays 0" trap.

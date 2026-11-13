@@ -34,3 +34,21 @@ eviction order. Print every hit, miss and eviction.
 - The error message for one deliberate mistake: put a `Profile` into the query cache. Paste the exact compiler or
   run-time text.
 - Hidden costs (boxing, dispatch, code duplication).
+
+## Part 4 (A+ only): outside the stdlib
+
+Added in D2 loop 2 (review-a.md F4, F9). Parts 1-3 are unchanged and every option's `expected.txt` still covers
+them; Part 4's expected output lives in `aplus/expected-aplus.txt`. It tests what a user can build when the
+stdlib's container set is closed. Its output is printed after Part 3, under the header
+`== Part 4 (A+ only): outside the stdlib ==`.
+
+- **4a, a typed event bus.** A user sum type `enum Event { Joined(name), Left(name), Message(from, text) }`.
+  A bus stores subscribers as closures; `publish` hands each one the event, and each subscriber dispatches with an
+  exhaustive `match`. Three subscribers, in this order: a logger; a counter of `Message` events (mutable state that
+  `main` reads at the end); a welcomer that numbers `Joined` events. Publish: joined ann, joined ben, ann says hi,
+  ben says hello, ann left, ben says anyone?. Then print `messages seen: N`. The program must show how a stored
+  closure keeps mutable state under ADR-0001 (it may not borrow).
+- **4b, mixed widget kinds.** A list of widgets of three kinds (button, slider, label) in the order button "OK",
+  slider, label "Hello", button "Cancel", slider. Kinds are a record of functions
+  `struct WidgetKind { name: Str, render: fn(Id) -> Str }`; per-kind state lives in Tables keyed by Id. Click "OK"
+  twice, set the sliders to 4/8 and 8/8, then render every widget in list order as `<kind>: <rendering>`.
