@@ -1,0 +1,344 @@
+> window main
+created window main
+> window aux
+created window aux
+> window main
+error: name main already exists
+> add main panel toolbar
+added panel toolbar to main
+> add main panel content
+added panel content to main
+> add content panel inner
+added panel inner to content
+> add toolbar button inc
+added button inc to toolbar
+> add toolbar button unsubber
+added button unsubber to toolbar
+> add toolbar button opener
+added button opener to toolbar
+> add aux panel box
+added panel box to aux
+> add aux label note bye
+added label note to aux
+> add box label deep hello
+added label deep to box
+> add box button closeme
+added button closeme to box
+> add inner label total count
+  subscribed total
+added label total to inner
+> add inner label once count-once
+  subscribed once
+added label once to inner
+> add inner label watch count
+  subscribed watch
+added label watch to inner
+> add inner label static fixed
+added label static to inner
+> add static label oops
+error: static cannot have children
+> add toolbar slider s1
+error: unknown kind slider
+> tree
+window main
+  panel toolbar
+    button inc
+    button unsubber
+    button opener
+  panel content
+    panel inner
+      label total "count=0" [subscribed]
+      label once "count=0" [subscribed]
+      label watch "count=0" [subscribed]
+      label static "fixed"
+window aux
+  panel box
+    label deep "hello"
+    button closeme
+  label note "bye"
+> stats
+stats: widgets=16 subscribers=3 cache=0 count=0
+> add content image img1 logo.png
+  cache: new logo.png (800 bytes)
+added image img1 to content
+> add content image img2 logo.png
+  cache: share logo.png users=2
+added image img2 to content
+> add inner image img3 other.png
+  cache: new other.png (900 bytes)
+added image img3 to inner
+> add inner image bad
+error: image bad needs a file name
+> tree
+window main
+  panel toolbar
+    button inc
+    button unsubber
+    button opener
+  panel content
+    panel inner
+      label total "count=0" [subscribed]
+      label once "count=0" [subscribed]
+      label watch "count=0" [subscribed]
+      label static "fixed"
+      image img3 other.png
+    image img1 logo.png
+    image img2 logo.png
+window aux
+  panel box
+    label deep "hello"
+    button closeme
+  label note "bye"
+> stats
+stats: widgets=19 subscribers=3 cache=2 count=0
+> remove img1
+  drop image img1
+  cache: release logo.png users=1
+removed img1
+> stats
+stats: widgets=18 subscribers=3 cache=2 count=0
+> remove img2
+  drop image img2
+  cache: release logo.png users=0
+  cache: drop logo.png
+removed img2
+> stats
+stats: widgets=17 subscribers=3 cache=1 count=0
+> on inc inc
+inc.onClick = inc
+> click inc
+  count=1
+  notify total: count=1
+  notify once: count=1
+  once: once unsubscribes itself
+  drop subscriber
+  notify watch: count=1
+click inc done
+> stats
+stats: widgets=17 subscribers=2 cache=1 count=1
+> click inc
+  count=2
+  notify total: count=2
+  notify watch: count=2
+click inc done
+> tree
+window main
+  panel toolbar
+    button inc [on:inc]
+    button unsubber
+    button opener
+  panel content
+    panel inner
+      label total "count=2" [subscribed]
+      label once "count=1"
+      label watch "count=2" [subscribed]
+      label static "fixed"
+      image img3 other.png
+window aux
+  panel box
+    label deep "hello"
+    button closeme
+  label note "bye"
+> on unsubber unsub static
+unsubber.onClick = unsub
+> click unsubber
+  unsub: static is not subscribed
+click unsubber done
+> on unsubber unsub total
+  replaced callback 'unsub'
+unsubber.onClick = unsub
+> on opener open popup
+opener.onClick = open
+> on nosuch inc
+error: no such widget nosuch
+> on unsubber fly
+error: unknown action fly
+> tree
+window main
+  panel toolbar
+    button inc [on:inc]
+    button unsubber [on:unsub total]
+    button opener [on:open popup]
+  panel content
+    panel inner
+      label total "count=2" [subscribed]
+      label once "count=1"
+      label watch "count=2" [subscribed]
+      label static "fixed"
+      image img3 other.png
+window aux
+  panel box
+    label deep "hello"
+    button closeme
+  label note "bye"
+> remove total
+  drop label total
+  drop subscriber
+removed total
+> stats
+stats: widgets=16 subscribers=1 cache=1 count=2
+> add inner label fresh count
+  subscribed fresh
+added label fresh to inner
+> click unsubber
+  unsub: label no longer exists (stale handle)
+click unsubber done
+> click inc
+  count=3
+  notify watch: count=3
+  notify fresh: count=3
+click inc done
+> on unsubber unsub watch
+  replaced callback 'unsub'
+unsubber.onClick = unsub
+> click unsubber
+  unsub: watch unsubscribed
+  drop subscriber
+click unsubber done
+> click unsubber
+  unsub: watch is not subscribed
+click unsubber done
+> click inc
+  count=4
+  notify fresh: count=4
+click inc done
+> tree
+window main
+  panel toolbar
+    button inc [on:inc]
+    button unsubber [on:unsub watch]
+    button opener [on:open popup]
+  panel content
+    panel inner
+      label once "count=1"
+      label watch "count=3"
+      label static "fixed"
+      image img3 other.png
+      label fresh "count=4" [subscribed]
+window aux
+  panel box
+    label deep "hello"
+    button closeme
+  label note "bye"
+> click opener
+  open: created window popup
+click opener done
+> click opener
+  open: popup already exists
+click opener done
+> tree
+window main
+  panel toolbar
+    button inc [on:inc]
+    button unsubber [on:unsub watch]
+    button opener [on:open popup]
+  panel content
+    panel inner
+      label once "count=1"
+      label watch "count=3"
+      label static "fixed"
+      image img3 other.png
+      label fresh "count=4" [subscribed]
+window aux
+  panel box
+    label deep "hello"
+    button closeme
+  label note "bye"
+window popup
+  label popup-label "opened"
+  button popup-close [on:close]
+> stats
+stats: widgets=20 subscribers=1 cache=1 count=4
+> click popup-close
+  close: removing window popup
+  drop window popup
+  drop label popup-label
+click popup-close done (button removed itself)
+  drop button popup-close
+> tree
+window main
+  panel toolbar
+    button inc [on:inc]
+    button unsubber [on:unsub watch]
+    button opener [on:open popup]
+  panel content
+    panel inner
+      label once "count=1"
+      label watch "count=3"
+      label static "fixed"
+      image img3 other.png
+      label fresh "count=4" [subscribed]
+window aux
+  panel box
+    label deep "hello"
+    button closeme
+  label note "bye"
+> stats
+stats: widgets=17 subscribers=1 cache=1 count=4
+> click popup-close
+error: no such widget popup-close
+> click opener
+  open: created window popup
+click opener done
+> on closeme close
+closeme.onClick = close
+> click closeme
+  close: removing window aux
+  drop window aux
+  drop panel box
+  drop label deep
+  drop label note
+click closeme done (button removed itself)
+  drop button closeme
+> tree
+window main
+  panel toolbar
+    button inc [on:inc]
+    button unsubber [on:unsub watch]
+    button opener [on:open popup]
+  panel content
+    panel inner
+      label once "count=1"
+      label watch "count=3"
+      label static "fixed"
+      image img3 other.png
+      label fresh "count=4" [subscribed]
+window popup
+  label popup-label "opened"
+  button popup-close [on:close]
+> stats
+stats: widgets=15 subscribers=1 cache=1 count=4
+> click note
+error: no such widget note
+> click inc
+  count=5
+  notify fresh: count=5
+click inc done
+> remove popup
+  drop window popup
+  drop label popup-label
+  drop button popup-close
+removed popup
+> remove main
+  drop window main
+  drop panel toolbar
+  drop button inc
+  drop button unsubber
+  drop button opener
+  drop panel content
+  drop panel inner
+  drop label once
+  drop label watch
+  drop label static
+  drop image img3
+  cache: release other.png users=0
+  cache: drop other.png
+  drop label fresh
+  drop subscriber
+removed main
+> tree
+(no windows)
+> stats
+stats: widgets=0 subscribers=0 cache=0 count=5
+exit report: widgets=0 subscribers=0 cache=0
+deferred drops: widgets=2 subscribers=1 cache=0

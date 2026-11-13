@@ -1,0 +1,86 @@
+# widgets script. Case numbers are from memory-cases.md.
+# case 7 setup: two windows, nested panels
+window main
+window aux
+window main
+add main panel toolbar
+add main panel content
+add content panel inner
+add toolbar button inc
+add toolbar button unsubber
+add toolbar button opener
+add aux panel box
+add aux label note bye
+add box label deep hello
+add box button closeme
+add inner label total count
+add inner label once count-once
+add inner label watch count
+add inner label static fixed
+add static label oops
+add toolbar slider s1
+tree
+stats
+# cases 12, 13: two images share one cache entry, a third uses another file
+add content image img1 logo.png
+add content image img2 logo.png
+add inner image img3 other.png
+add inner image bad
+tree
+stats
+# case 12/13: remove one user, the entry stays; remove the last user, the entry is dropped
+remove img1
+stats
+remove img2
+stats
+# cases 8, 20, 21: inc notifies; label "once" unsubscribes itself during the notify
+on inc inc
+click inc
+stats
+click inc
+tree
+# case 8: on replaces a callback (the old one is freed)
+on unsubber unsub static
+click unsubber
+on unsubber unsub total
+on opener open popup
+on nosuch inc
+on unsubber fly
+tree
+# case 16: a label is removed while subscribed; its subscription goes with it
+remove total
+stats
+# a new label reuses the freed slot (old handles must not match it)
+add inner label fresh count
+# case 15: callback captured the removed label total; the stale handle is detected
+click unsubber
+click inc
+# the same button now unsubscribes a live label, twice
+on unsubber unsub watch
+click unsubber
+click unsubber
+click inc
+tree
+# case 21: open creates a window during the click (adds while the button is borrowed)
+click opener
+click opener
+tree
+stats
+# case 11, 19: close finds the enclosing window and removes it, including the clicked button
+click popup-close
+tree
+stats
+click popup-close
+click opener
+# case 19 with nesting: closeme is two levels below the window aux
+on closeme close
+click closeme
+tree
+stats
+click note
+click inc
+# case 7: remove a whole subtree, then everything
+remove popup
+remove main
+tree
+stats

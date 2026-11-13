@@ -24,6 +24,8 @@ command per line on stdin; `#` lines are comments. Output is deterministic.
 | `tree` | print every window and its subtree, indented two spaces per level |
 | `stats` | print live widgets, subscribers, cache entries and model count |
 
+Extension: `add PARENT label NAME count-once` subscribes like `count`, but the subscriber unsubscribes itself during its first notification.
+
 ## Cases it must exercise (numbers from `memory-cases.md`)
 
 | # | Case | In `widgets` |
