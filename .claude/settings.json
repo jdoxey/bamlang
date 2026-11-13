@@ -1,0 +1,13 @@
+{
+  "model": "sonnet",
+  "permissions": {
+    "deny": [
+      "Edit(docs/CHARTER.md)",
+      "Edit(docs/RULINGS.md)",
+      "Edit(.claude/settings.json)",
+      "Edit(.github/workflows/charter-guard.yml)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)"
+    ]
+  }
+}

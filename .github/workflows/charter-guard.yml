@@ -1,0 +1,31 @@
+# Tripwire. Fails when a push to main changes an owner-only file, so the owner
+# gets GitHub's failed-run email. When the owner made the change, ignore it.
+name: charter-guard
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  charter-guard:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Fail if owner-only files changed
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          case "$BEFORE" in 0000000*) echo "First push."; exit 0;; esac
+          changed=$(git diff --name-only "$BEFORE" "$AFTER" -- \
+            docs/CHARTER.md docs/RULINGS.md .claude/settings.json \
+            .github/workflows/charter-guard.yml)
+          if [ -n "$changed" ]; then
+            echo "::error::Owner-only files changed:"; echo "$changed"; exit 1
+          fi
+          echo "OK"
