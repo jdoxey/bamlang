@@ -2,11 +2,14 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D7, the DSL and declarative layout mechanism (G11) without macros or annotations.
+- **Now:** your issue #4 (named parameters): amending ADR-0006 so every argument is `name: value`. D7 (DSL) is paused at step 3 and resumes after.
 - **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (newline-terminated, braces, `Name(field: v)`; parser and corpus in `docs/examples/syntax/p3/`). Veto by opening an issue.
 - **Needs you:** nothing. Issue #3 answered (yes); your mitigations are in ADR-0002.
 
 ## Next action
+
+**Issue #4 first.** Amendment 1 to ADR-0006 (`docs/adr/0006-research/named/`). Steps 1-2 done. Step 3: `docs/examples/syntax/p3n/` (fully labelled corpus, strict parser, meaning check); measure F1 strict+pun, F2 one-parameter exemption, F3 positional function values. Step 4: Fable reviewer, scores, amend ADR-0006. Then redo D7's three parsers on top of p3n.
+
 
 Roadmap item **D7** (ADR-0007, Full). Inputs:
 - G11 and Q15: is G11 syntax only, or a UI framework in v1? Earlier ADRs assumed syntax only for v1. Decide.
