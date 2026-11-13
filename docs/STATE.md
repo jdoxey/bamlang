@@ -8,7 +8,7 @@
 
 ## Next action
 
-**D7 step 3 redo:** amendment 1 rules out D2 (variadic). Rebase D1 clauses and D3 pipelines on `docs/examples/syntax/p3n/parser.py` (labelled corpus), relabel their DSL corpora, and rerun `compare.md` numbers. Then step 4: scores.py, Fable reviewer (until 2026-11-16), ADR-0007.
+**D7 loop 2** (review `0007-research/review-d1.md`): `docs/examples/dsl/lib/` declares the UI, build, HTML and test libraries in the stdlib generic dialect. D1's grammar is fixed (nesting, `if x = opt =>`, no rewind); the D1 corpus is rewritten with copies, 20 test cases and escaping; the C1 baseline (no new syntax) is built. Then rescore D1 vs C1 by script and write ADR-0007 (a tie goes to D1 on G11 unless C1 reads as well).
 
 
 Roadmap item **D7** (ADR-0007, Full). Inputs:
