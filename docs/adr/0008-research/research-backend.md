@@ -66,3 +66,16 @@
 3. Windows PDBs need lld-link or link.exe.
 4. Coverage mapping fidelity.
 5. LLVM's weight and churn.
+
+## CI facts (2026-11-14, run 43486134629)
+
+- **clang versions:**
+  - ubuntu-24.04: Ubuntu clang 18.1.3;
+  - windows-2025: clang 20.1.8 (`x86_64-pc-windows-msvc`);
+  - macos-26: Apple clang 21.0.0 (arm64), with `llvm-cov`/`llvm-profdata` through `xcrun`;
+  - local: 19.1.7.
+
+  The spikes' textual IR was accepted by all four.
+- **Windows debuggers:**
+  - `liblldb.dll` needs `python310.dll` (fixed with setup-python 3.10).
+  - The Windows SDK Debuggers directory exists but isn't on the PATH (added).

@@ -31,6 +31,15 @@ jobs:
       - name: Install OCaml 5 (macOS)
         if: runner.os == 'macOS'
         run: brew install ocaml
+      - name: Python 3.10 for lldb (Windows; LLVM's liblldb.dll links python310.dll)
+        if: runner.os == 'Windows'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Debuggers on PATH (Windows; cdb from the Windows SDK)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "C:\\Program Files (x86)\\Windows Kits\\10\\Debuggers\\x64" >> "$GITHUB_PATH"
       - name: Install gdb and LLVM tools (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update -q && sudo apt-get install -y -q gdb llvm lld
