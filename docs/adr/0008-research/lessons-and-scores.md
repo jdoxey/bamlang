@@ -47,3 +47,11 @@ three calls deep that must run four drops while it unwinds. CI runs each spike o
   no per-scope run-time cost.
 - **Reversibility favours keeping a lowered-IR boundary,** so that a C emitter stays possible as a fallback. The
   reviewer attacks K1.
+
+## Windows debugger evidence (CI 43486847096, cdb from the Windows SDK)
+
+- **K3 (C through clang):** `dx p` gives `p [Type: Point]` with `x : 3 [Type: __int64]` and `y : 4 [Type: __int64]`.
+  It meets the G8 gate on Windows.
+- **K1 (own LLVM IR):** `dx p` gives `p : 0x3 [Type: Point *]` and "Unable to read memory at Address 0x3". The Win64
+  ABI passes a 16-byte struct by reference, while K1's IR passes `%Point` by value with a `dbg.declare` that no
+  longer matches. This is review S2 (the frontend owns the per-target ABI) showing up as wrong debug info.

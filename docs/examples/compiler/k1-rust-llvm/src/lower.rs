@@ -1,11 +1,12 @@
 // Lowering: checked AST -> structured IR. Handles drops (normal exit and unwind cleanups),
-// invoke/landing pads (or funclets on Windows), expect_trap, and optional line counters.
+// invoke/landing pads (or funclets on Windows), expect_trap, crews, enums/match, and (with
+// `cov`) llvm.instrprof counters plus the coverage regions that go with them.
 use crate::ast::*;
 use crate::check::Info;
 use crate::ir::*;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 
-const LP_TY: &str = "{ ptr, i32 }";
+
 
 struct Var { ptr: Op, ty: Type }
 #[derive(Default)]
@@ -23,43 +24,46 @@ struct Cx {
     eh: bool,
     funclet: Option<usize>,
     ret: Type,
+    ncounters: u32,
+    is_last: bool,
+    regions: Vec<Region>,
+    blk_end: Vec<(u32, u32)>, // end of each enclosing block (for "rest of the block" regions)
 }
 
 struct L<'a> {
     info: &'a Info,
     win: bool,
     cov: bool,
+    file: String,
+    disp: String,
     strings: Vec<String>,
     funcs: Vec<Func>,
     pending: Vec<(String, String, &'a Lambda)>,
     nlambda: usize,
-    cov_lines: BTreeSet<u32>,
-    ranges: Vec<(String, u32, u32)>,
     cx: Cx,
 }
 
 fn new_cx(ret: &Type) -> Cx {
-    Cx { regs: 0, blocks: vec![], cur: 0, scopes: vec![], allocas: vec![], dbgvars: vec![], lp: HashMap::new(), nlabel: 0, eh: false, funclet: None, ret: ret.clone() }
+    Cx { regs: 0, blocks: vec![], cur: 0, scopes: vec![], allocas: vec![], dbgvars: vec![], lp: HashMap::new(), nlabel: 0, eh: false, funclet: None, ret: ret.clone(), ncounters: 0, is_last: false, regions: vec![], blk_end: vec![] }
 }
 
 pub fn lty(t: &Type) -> LTy {
-    match t { Type::Int => LTy::I64, Type::Str => LTy::Ptr, Type::Bool => LTy::I1, Type::Unit | Type::Action => LTy::Void,
+    match t { Type::Int => LTy::I64, Type::Str => LTy::Ptr, Type::Bool => LTy::I1, Type::Unit | Type::Action => LTy::Void, Type::Crew => LTy::Ptr,
         Type::Struct(n) => LTy::Named(format!("%{}", n)) }
 }
 
-pub fn lower<'a>(p: &'a Program, info: &'a Info, win: bool, cov: bool) -> Module {
-    let mut l = L { info, win, cov, strings: vec![], funcs: vec![], pending: vec![], nlambda: 0, cov_lines: BTreeSet::new(), ranges: vec![], cx: new_cx(&Type::Unit) };
+pub fn lower<'a>(p: &'a Program, info: &'a Info, win: bool, cov: bool, file: &str) -> Module {
+    let mut l = L { info, win, cov, file: file.to_string(), disp: String::new(), strings: vec![], funcs: vec![], pending: vec![], nlambda: 0, cx: new_cx(&Type::Unit) };
     for t in &p.types {
         if let Some(d) = &t.drop {
-            l.func(&format!("p3_{}_drop", t.name), &format!("{}.drop", t.name), Some(&t.name), &[], &Type::Unit, &d.body, d.line, d.end_line);
+            l.func(&format!("p3_{}_drop", t.name), &format!("{}.drop", t.name), Some(&t.name), &[], &Type::Unit, &d.body, d.line, d.span);
         }
     }
-    for f in &p.fns { l.func(&format!("p3_{}", f.name), &f.name, None, &f.params, &f.ret, &f.body, f.line, f.end_line); }
+    for f in &p.fns { l.func(&format!("p3_{}", f.name), &f.name, None, &f.params, &f.ret, &f.body, f.line, f.span); }
     while let Some((name, disp, lam)) = l.pending.pop() {
-        l.func(&name, &disp, None, &[], &Type::Unit, &lam.body, lam.line, lam.end_line);
+        l.func(&name, &disp, None, &[], &Type::Unit, &lam.body, lam.line, lam.span);
     }
-    Module { structs: l.info.structs.clone(),
-        funcs: l.funcs, strings: l.strings, cov_lines: l.cov_lines, ranges: l.ranges }
+    Module { structs: l.info.structs.clone(), enums: l.info.enums.clone(), funcs: l.funcs, strings: l.strings }
 }
 
 impl<'a> L<'a> {
@@ -86,8 +90,15 @@ impl<'a> L<'a> {
     fn live_drops(&self) -> Vec<(Op, String)> {
         self.cx.scopes.iter().rev().flat_map(|s| s.drops.iter().rev().cloned()).collect()
     }
-    fn drop_calls(&mut self, drops: &[(Op, String)], line: u32) {
-        for (p, s) in drops { self.plain(&format!("p3_{}_drop", s), vec![p.clone()], LTy::Void, line); }
+    // Normal exit: plain drop calls. In a cleanup pad (`shim`): every drop goes through the runtime's
+    // p3_cleanup_drop, which catches a trap inside the drop, appends it to the trap chain and returns,
+    // so the unwind carries on and the remaining drops still run (ADR-0004 rule 8).
+    fn drop_calls(&mut self, drops: &[(Op, String)], line: u32, shim: bool) {
+        for (p, s) in drops {
+            if s == "$crew" { self.plain("p3_crew_quiet", vec![p.clone()], LTy::Void, line); }
+            else if shim { self.plain("p3_cleanup_drop", vec![Op::Global(format!("p3_{}_drop", s)), p.clone()], LTy::Void, line); }
+            else { self.plain(&format!("p3_{}_drop", s), vec![p.clone()], LTy::Void, line); }
+        }
     }
     // A call that may unwind: an `invoke` to a cleanup block when droppable locals are live.
     fn call(&mut self, callee: &str, args: Vec<Op>, ret: LTy, line: u32) -> Option<Op> {
@@ -113,13 +124,13 @@ impl<'a> L<'a> {
             let pad = self.reg();
             self.emit(Inst::CleanupPad { dst: pad }, 0);
             self.cx.funclet = Some(pad);
-            self.drop_calls(drops, line);
+            self.drop_calls(drops, line, true);
             self.term(Term::CleanupRet(pad), line);
         } else {
             let lp = self.reg();
-            self.emit(Inst::Landing { dst: lp, catch: false }, 0);
-            self.drop_calls(drops, line);
-            self.term(Term::Resume(Op::Reg(lp, LTy::Named(LP_TY.into()))), line);
+            self.emit(Inst::Landing { dst: lp }, 0);
+            self.drop_calls(drops, line, true);
+            self.term(Term::Resume(Op::Reg(lp, LTy::Named("{ ptr, i32 }".into()))), line);
         }
         self.cx.cur = saved;
         self.cx.funclet = saved_f;
@@ -127,14 +138,21 @@ impl<'a> L<'a> {
         self.cx.lp.insert(key, l.clone());
         l
     }
-    fn cov_mark(&mut self, line: u32) {
-        if !self.cov { return; }
-        self.cov_lines.insert(line);
-        let (g, v, n) = (self.reg(), self.reg(), self.reg());
-        self.emit(Inst::Elem { dst: g, base: Op::Global("__p3_cov".into()), idx: line as i64 }, line);
-        self.emit(Inst::Load { dst: v, ty: LTy::I64, ptr: Op::Reg(g, LTy::Ptr) }, line);
-        self.emit(Inst::Bin { dst: n, op: "add", a: Op::Reg(v, LTy::I64), b: Op::Int(1) }, line);
-        self.emit(Inst::Store { val: Op::Reg(n, LTy::I64), ptr: Op::Reg(g, LTy::Ptr) }, line);
+    // ---- source-based coverage: one counter per region, incremented with llvm.instrprof.increment.
+    fn counter(&mut self) -> Option<u32> {
+        if !self.cov { return None; }
+        self.cx.ncounters += 1;
+        Some(self.cx.ncounters - 1)
+    }
+    fn prof(&mut self, c: Option<u32>, line: u32) { if let Some(idx) = c { self.emit(Inst::Prof { idx }, line); } }
+    fn region(&mut self, kind: Option<RKind>, span: Span) { if let Some(kind) = kind { self.cx.regions.push(Region { kind, span }); } }
+    // Counter + region for "the rest of the enclosing block" after a compound statement, if anything follows it.
+    fn rest_of_block(&mut self, end: (u32, u32), last: bool, line: u32) {
+        if !self.cov || last { return; }
+        let c = self.counter();
+        self.prof(c, line);
+        let (l2, c2) = *self.cx.blk_end.last().unwrap();
+        self.region(c.map(RKind::Code), Span { l1: end.0, c1: end.1, l2, c2 });
     }
 
     fn declare(&mut self, name: &str, ty: &Type, line: u32, arg: Option<usize>, init: Op) -> Op {
@@ -143,7 +161,7 @@ impl<'a> L<'a> {
         self.cx.allocas.push(Inst::Alloca { dst: r, ty: lt });
         let ptr = Op::Reg(r, LTy::Ptr);
         self.emit(Inst::Store { val: init, ptr: ptr.clone() }, line);
-        if *ty != Type::Bool {
+        if *ty != Type::Bool && *ty != Type::Crew {
             self.cx.dbgvars.push(DbgVar { name: name.into(), ty: ty.clone(), line, arg });
             let var = self.cx.dbgvars.len() - 1;
             self.emit(Inst::DbgDeclare { ptr: ptr.clone(), var }, line);
@@ -156,8 +174,11 @@ impl<'a> L<'a> {
         ptr
     }
 
-    fn func(&mut self, name: &str, disp: &str, self_ty: Option<&str>, params: &[(String, Type)], ret: &Type, body: &'a [Stmt], line: u32, end_line: u32) {
+    fn func(&mut self, name: &str, disp: &str, self_ty: Option<&str>, params: &[(String, Type)], ret: &Type, body: &'a [Stmt], line: u32, span: Span) {
+        let end_line = span.l2;
         self.cx = new_cx(ret);
+        self.disp = disp.to_string();
+        self.cx.blk_end.push((span.l2, span.c2));
         let entry = self.new_block("entry");
         self.cx.cur = entry;
         self.cx.scopes.push(Scope::default());
@@ -171,13 +192,14 @@ impl<'a> L<'a> {
         for (i, ((n, t), r)) in params.iter().zip(regs).enumerate() {
             self.declare(n, t, line, Some(i + 1), Op::Reg(r, lty(t)));
         }
-        self.cov_mark(line);
-        self.ranges.push((disp.to_string(), line, end_line));
+        let c0 = self.counter();
+        self.prof(c0, line);
+        self.region(c0.map(RKind::Code), span);
         self.stmts(body);
         if self.cx.blocks[self.cx.cur].term.is_none() {
             if *ret == Type::Unit {
                 let d = self.cx.scopes[0].drops.iter().rev().cloned().collect::<Vec<_>>();
-                self.drop_calls(&d, end_line);
+                self.drop_calls(&d, end_line, false);
                 self.term(Term::Ret(None), end_line);
             } else { self.term(Term::Unreachable, end_line); }
         }
@@ -187,27 +209,32 @@ impl<'a> L<'a> {
         pre.append(&mut blocks[0].insts);
         blocks[0].insts = pre;
         self.funcs.push(Func { name: name.into(), disp: disp.into(), ret: lty(ret), sig: params.iter().map(|(_, t)| t.clone()).collect(),
-            ret_ty: ret.clone(), params: fparams, blocks, dbgvars: cx.dbgvars, eh: cx.eh, line });
+            ret_ty: ret.clone(), params: fparams, blocks, dbgvars: cx.dbgvars, eh: cx.eh, line, ncounters: cx.ncounters, regions: cx.regions });
     }
 
-    fn stmts(&mut self, v: &'a [Stmt]) { for s in v { self.stmt(s); } }
-    fn scoped(&mut self, v: &'a [Stmt], line: u32) {
+    fn stmts(&mut self, v: &'a [Stmt]) {
+        let n = v.len();
+        for (i, s) in v.iter().enumerate() { self.cx.is_last = i + 1 == n; self.stmt(s); }
+    }
+    // A `{ }` block: its own scope, drops at the normal end, `span` marks where it ends for "rest of block" regions.
+    fn block(&mut self, v: &'a [Stmt], span: Span, line: u32) {
         self.cx.scopes.push(Scope::default());
+        self.cx.blk_end.push((span.l2, span.c2));
         self.stmts(v);
+        self.cx.blk_end.pop();
         let d = self.cx.scopes.last().unwrap().drops.iter().rev().cloned().collect::<Vec<_>>();
-        self.drop_calls(&d, line);
+        self.drop_calls(&d, line, false);
         self.cx.scopes.pop();
     }
     fn stmt(&mut self, s: &'a Stmt) {
         let line = s.line;
+        let last = self.cx.is_last;
         match &s.kind {
             StmtKind::Let { name, init, .. } => {
-                self.cov_mark(line);
                 let v = self.expr(init).unwrap();
                 self.declare(name, &init.ty, line, None, v);
             }
             StmtKind::Assign { name, op, value } => {
-                self.cov_mark(line);
                 let v = self.expr(value).unwrap();
                 let (ptr, ty) = { let var = self.var(name); (var.ptr.clone(), var.ty.clone()) };
                 let nv = match op {
@@ -219,44 +246,70 @@ impl<'a> L<'a> {
                 };
                 self.emit(Inst::Store { val: nv, ptr }, line);
             }
-            StmtKind::If { cond, then, els } => {
-                self.cov_mark(line);
+            StmtKind::If { cond, cond_span, then, then_span, els } => {
                 let c = self.expr(cond).unwrap();
                 let (tb, eb, end) = (self.new_block("then"), self.new_block("else"), self.new_block("endif"));
                 let (tl, el, endl) = (self.lbl(tb), self.lbl(eb), self.lbl(end));
-                self.term(Term::CondBr(c, tl, if els.is_some() { el } else { endl.clone() }), line);
+                let (ct, cf) = (self.counter(), self.counter());
+                if let (Some(t), Some(f)) = (ct, cf) { self.region(Some(RKind::Branch(t, f)), *cond_span); }
+                self.term(Term::CondBr(c, tl, el), line);
                 self.cx.cur = tb;
-                self.scoped(then, line);
+                self.prof(ct, line);
+                self.region(ct.map(RKind::Code), *then_span);
+                self.block(then, *then_span, line);
                 self.term(Term::Br(endl.clone()), line);
                 self.cx.cur = eb;
-                if let Some(e) = els { self.scoped(e, line); }
+                self.prof(cf, line);
+                if let Some((e, es)) = els { self.region(cf.map(RKind::Code), *es); self.block(e, *es, line); }
                 self.term(Term::Br(endl), line);
                 self.cx.cur = end;
+                self.rest_of_block(s.end, last, line);
             }
-            StmtKind::While { cond, body } => {
+            StmtKind::While { cond, cond_span, body, body_span } => {
                 let (cb, bb, end) = (self.new_block("while.cond"), self.new_block("while.body"), self.new_block("while.end"));
                 let cl = self.lbl(cb);
+                let (cc, cbody, cend) = (self.counter(), self.counter(), self.counter());
                 self.term(Term::Br(cl.clone()), line);
                 self.cx.cur = cb;
-                self.cov_mark(line);
+                self.prof(cc, line);
+                self.region(cc.map(RKind::Code), *cond_span);
+                if let (Some(t), Some(f)) = (cbody, cend) { self.region(Some(RKind::Branch(t, f)), *cond_span); }
                 let c = self.expr(cond).unwrap();
                 let (bl, el) = (self.lbl(bb), self.lbl(end));
                 self.term(Term::CondBr(c, bl, el), line);
                 self.cx.cur = bb;
-                self.scoped(body, line);
+                self.prof(cbody, line);
+                self.region(cbody.map(RKind::Code), *body_span);
+                self.block(body, *body_span, line);
                 self.term(Term::Br(cl), line);
                 self.cx.cur = end;
+                self.prof(cend, line);
+                self.rest_of_block(s.end, last, line);
+            }
+            StmtKind::Crew { name, body, span } => {
+                // crew c { .. }: the handle is a droppable local ("$crew") so a trap in the body still joins the threads;
+                // on normal exit the body's locals drop first, then p3_crew_join joins and re-raises the first child trap.
+                let h = self.plain("p3_crew_new", vec![], LTy::Ptr, line).unwrap();
+                self.cx.scopes.push(Scope::default());
+                self.cx.blk_end.push((span.l2, span.c2));
+                self.declare(name, &Type::Crew, line, None, h.clone());
+                self.cx.scopes.last_mut().unwrap().drops.push((h.clone(), "$crew".into()));
+                self.stmts(body);
+                self.cx.blk_end.pop();
+                let d = self.cx.scopes.last().unwrap().drops.iter().rev().skip(1).cloned().collect::<Vec<_>>();
+                self.drop_calls(&d, span.l2, false);
+                self.cx.scopes.pop();
+                self.call("p3_crew_join", vec![h], LTy::Void, span.l2);
             }
             StmtKind::Return(e) => {
-                self.cov_mark(line);
                 let v = e.as_ref().and_then(|e| self.expr(e));
                 let d = self.live_drops();
-                self.drop_calls(&d, line);
+                self.drop_calls(&d, line, false);
                 self.term(Term::Ret(v), line);
                 let dead = self.new_block("dead");
                 self.cx.cur = dead;
             }
-            StmtKind::Expr(e) => { self.cov_mark(line); self.expr(e); }
+            StmtKind::Expr(e) => { self.expr(e); }
         }
     }
     fn var(&self, n: &str) -> &Var { self.cx.scopes.iter().rev().find_map(|s| s.vars.get(n)).expect("checked name") }
@@ -318,14 +371,83 @@ impl<'a> L<'a> {
                 let (a, b) = (self.expr(l).unwrap(), self.expr(r).unwrap());
                 Some(self.binop(*o, a, b, line))
             }
-            ExprKind::Lambda(_) => unreachable!("lambdas only appear as expect_trap's argument"),
+            ExprKind::Lambda(_) | ExprKind::Method { .. } => unreachable!("lambdas appear only inside expect_trap/go; methods are rewritten by the checker"),
+            ExprKind::Go { crew, task } => {
+                let name = self.new_lambda(task);
+                let p = self.var(crew).ptr.clone();
+                let h = self.load(&Type::Crew, p, line);
+                self.plain("p3_crew_go", vec![h, Op::Global(name)], LTy::Void, line);
+                None
+            }
+            ExprKind::Variant { en, tag, args } => {
+                let vals: Vec<Op> = args.iter().map(|a| self.expr(&a.value).unwrap()).collect();
+                let lt = LTy::Named(format!("%{}", en));
+                let d = self.reg();
+                self.emit(Inst::Insert { dst: d, agg: Op::Undef(lt.clone()), val: Op::Int(*tag as i64), idx: vec![0] }, line);
+                let mut agg = Op::Reg(d, lt.clone());
+                for (i, (v, a)) in vals.into_iter().zip(args).enumerate() {
+                    let v = if a.value.ty == Type::Str { self.cast("ptrtoint", v, LTy::I64, line) } else { v };
+                    let d = self.reg();
+                    self.emit(Inst::Insert { dst: d, agg, val: v, idx: vec![1, i] }, line);
+                    agg = Op::Reg(d, lt.clone());
+                }
+                Some(agg)
+            }
+            ExprKind::Match { scrut, arms } => {
+                let sv = self.expr(scrut).unwrap();
+                let tag = self.reg();
+                self.emit(Inst::Extract { dst: tag, agg: sv.clone(), idx: vec![0] }, line);
+                let rt = lty(&e.ty);
+                let slot = self.reg();
+                self.cx.allocas.push(Inst::Alloca { dst: slot, ty: rt.clone() });
+                let join = self.new_block("match.end");
+                let jl = self.lbl(join);
+                for (i, a) in arms.iter().enumerate() {
+                    let ab = self.new_block("arm");
+                    let next = if i + 1 < arms.len() {
+                        let nb = self.new_block("arm.next");
+                        let cmp = self.reg();
+                        self.emit(Inst::Icmp { dst: cmp, pred: "eq", a: Op::Reg(tag, LTy::I64), b: Op::Int(a.tag as i64) }, a.line);
+                        let (al, nl) = (self.lbl(ab), self.lbl(nb));
+                        self.term(Term::CondBr(Op::Reg(cmp, LTy::I1), al, nl), a.line);
+                        Some(nb)
+                    } else { let al = self.lbl(ab); self.term(Term::Br(al), a.line); None };
+                    self.cx.cur = ab;
+                    let c = self.counter();
+                    self.prof(c, a.line);
+                    self.region(c.map(RKind::Code), a.span);
+                    self.cx.scopes.push(Scope::default());
+                    for (j, (b, bt)) in a.binders.iter().zip(&a.btys).enumerate() {
+                        let d = self.reg();
+                        self.emit(Inst::Extract { dst: d, agg: sv.clone(), idx: vec![1, j] }, a.line);
+                        let mut v = Op::Reg(d, LTy::I64);
+                        if *bt == Type::Str { v = self.cast("inttoptr", v, LTy::Ptr, a.line); }
+                        self.declare(b, bt, a.line, None, v);
+                    }
+                    let v = self.expr(&a.body).unwrap();
+                    self.emit(Inst::Store { val: v, ptr: Op::Reg(slot, LTy::Ptr) }, a.line);
+                    self.cx.scopes.pop();
+                    self.term(Term::Br(jl.clone()), a.line);
+                    if let Some(nb) = next { self.cx.cur = nb; }
+                }
+                self.cx.cur = join;
+                Some(self.load(&e.ty, Op::Reg(slot, LTy::Ptr), line))
+            }
             ExprKind::Call { name, args } => {
                 match name.as_str() {
                     "print" => { let a = self.expr(&args[0].value).unwrap(); self.plain("p3_print", vec![a], LTy::Void, line); None }
-                    "trap" => { let a = self.expr(&args[0].value).unwrap(); self.call("p3_trap", vec![a], LTy::Void, line); None }
+                    "trap" => {
+                        let a = self.expr(&args[0].value).unwrap();
+                        let loc = Op::Global(self.string(&format!("{}:{}", self.file, line)));
+                        let f = Op::Global(self.string(&self.disp.clone()));
+                        self.call("p3_trap", vec![a, loc, f], LTy::Void, line);
+                        None
+                    }
                     "expect_trap" => {
-                        if let ExprKind::Lambda(l) = &args[0].value.kind { self.expect_trap(l, line); }
-                        else { unreachable!() }
+                        if let ExprKind::Lambda(l) = &args[0].value.kind {
+                            let name = self.new_lambda(l);
+                            self.plain("p3_expect_trap", vec![Op::Global(name)], LTy::Void, line);
+                        } else { unreachable!() }
                         None
                     }
                     _ => {
@@ -335,7 +457,7 @@ impl<'a> L<'a> {
                             let mut agg = Op::Undef(lt.clone());
                             for (i, v) in vals.into_iter().enumerate() {
                                 let d = self.reg();
-                                self.emit(Inst::Insert { dst: d, ty: lt.clone(), agg, val: v, idx: i }, line);
+                                self.emit(Inst::Insert { dst: d, agg, val: v, idx: vec![i] }, line);
                                 agg = Op::Reg(d, lt.clone());
                             }
                             Some(agg)
@@ -348,46 +470,16 @@ impl<'a> L<'a> {
         }
     }
 
-    // expect_trap(action: fn() { .. }): invoke the lambda, catch the trap, print `trapped: <msg>`.
-    fn expect_trap(&mut self, l: &'a Lambda, line: u32) {
+    // Hoist a capture-free lambda to a top-level function and return its symbol.
+    fn new_lambda(&mut self, l: &'a Lambda) -> String {
         let name = format!("p3_lambda{}", self.nlambda);
         self.pending.push((name.clone(), format!("lambda{}", self.nlambda), l));
         self.nlambda += 1;
-        self.cx.eh = true;
-        let cont = self.new_block("trap.cont");
-        let h = self.new_block(if self.win { "catch.dispatch" } else { "catch" });
-        let ci = CallInfo { dst: None, ret: LTy::Void, callee: name, args: vec![], funclet: self.cx.funclet };
-        let (cl, hl) = (self.lbl(cont), self.lbl(h));
-        self.term(Term::Invoke(ci, cl.clone(), hl), line);
-        self.cx.cur = h;
-        let saved_f = self.cx.funclet;
-        let prefix = Op::Global(self.string("trapped: "));
-        if self.win {
-            let body = self.new_block("catch.body");
-            let (cs, bl) = (self.reg(), self.lbl(body));
-            self.term(Term::CatchSwitch { dst: cs, handler: bl }, line);
-            self.cx.cur = body;
-            let cp = self.reg();
-            self.emit(Inst::CatchPad { dst: cp, sw: cs }, line);
-            self.cx.funclet = Some(cp);
-            self.report(prefix, line);
-            self.term(Term::CatchRet(cp, cl), line);
-        } else {
-            let lp = self.reg();
-            self.emit(Inst::Landing { dst: lp, catch: true }, line);
-            let ex = self.reg();
-            self.emit(Inst::Extract { dst: ex, ty: LTy::Ptr, agg: Op::Reg(lp, LTy::Named(LP_TY.into())), idx: 0 }, line);
-            self.plain("__cxa_begin_catch", vec![Op::Reg(ex, LTy::Ptr)], LTy::Ptr, line);
-            self.report(prefix, line);
-            self.plain("__cxa_end_catch", vec![], LTy::Void, line);
-            self.term(Term::Br(cl), line);
-        }
-        self.cx.funclet = saved_f;
-        self.cx.cur = cont;
+        name
     }
-    fn report(&mut self, prefix: Op, line: u32) {
-        let m = self.plain("p3_trap_message", vec![], LTy::Ptr, line).unwrap();
-        let s = self.plain("p3_concat", vec![prefix, m], LTy::Ptr, line).unwrap();
-        self.plain("p3_print", vec![s], LTy::Void, line);
+    fn cast(&mut self, op: &'static str, val: Op, to: LTy, line: u32) -> Op {
+        let d = self.reg();
+        self.emit(Inst::Cast { dst: d, op, val, to: to.clone() }, line);
+        Op::Reg(d, to)
     }
 }

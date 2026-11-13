@@ -8,23 +8,26 @@ pub enum Part { Lit(String), Expr(String, u32) }
 pub enum Tok { Ident(String), Int(i64), Str(Vec<Part>), Sym(&'static str), Newline, Eof }
 
 #[derive(Clone, Debug)]
-pub struct Token { pub tok: Tok, pub line: u32 }
+pub struct Token { pub tok: Tok, pub line: u32, pub col: u32, pub end_col: u32 }
 
-const SYMS: [&str; 20] = ["->", "==", "+=", "-=", "{", "}", "(", ")", "[", "]", ",", ":", ".", ";", "+", "-", "*", "<", ">", "="];
+const SYMS: [&str; 21] = ["->", "=>", "==", "+=", "-=", "{", "}", "(", ")", "[", "]", ",", ":", ".", ";", "+", "-", "*", "<", ">", "="];
 
 pub fn lex(src: &str, start_line: u32) -> R<Vec<Token>> {
     let ch: Vec<char> = src.chars().collect();
     let (mut i, mut line) = (0usize, start_line);
+    let mut ls = 0usize; // index of the first char of the current line (columns are 1-based chars)
     let mut stack: Vec<char> = vec![];
     let mut out: Vec<Token> = vec![];
     while i < ch.len() {
         let c = ch[i];
+        let t0 = i;
         if c == '\n' {
             if !matches!(stack.last(), Some('(') | Some('[')) {
-                out.push(Token { tok: Tok::Newline, line });
+                out.push(Token { tok: Tok::Newline, line, col: (i - ls + 1) as u32, end_col: (i - ls + 1) as u32 });
             }
             line += 1;
             i += 1;
+            ls = i;
         } else if c == ' ' || c == '\t' || c == '\r' {
             i += 1;
         } else if c == '#' {
@@ -61,18 +64,18 @@ pub fn lex(src: &str, start_line: u32) -> R<Vec<Token>> {
                 }
             }
             if !lit.is_empty() || parts.is_empty() { parts.push(Part::Lit(lit)); }
-            out.push(Token { tok: Tok::Str(parts), line });
+            out.push(Token { tok: Tok::Str(parts), line, col: (t0 - ls + 1) as u32, end_col: (i - ls + 1) as u32 });
         } else if c.is_ascii_digit() {
             let mut n: i64 = 0;
             while i < ch.len() && (ch[i].is_ascii_digit() || ch[i] == '_') {
                 if ch[i] != '_' { n = n.checked_mul(10).and_then(|n| n.checked_add(ch[i] as i64 - 48)).ok_or((line, "integer too large".to_string()))?; }
                 i += 1;
             }
-            out.push(Token { tok: Tok::Int(n), line });
+            out.push(Token { tok: Tok::Int(n), line, col: (t0 - ls + 1) as u32, end_col: (i - ls + 1) as u32 });
         } else if c.is_alphabetic() || c == '_' {
             let mut s = String::new();
             while i < ch.len() && (ch[i].is_alphanumeric() || ch[i] == '_') { s.push(ch[i]); i += 1; }
-            out.push(Token { tok: Tok::Ident(s), line });
+            out.push(Token { tok: Tok::Ident(s), line, col: (t0 - ls + 1) as u32, end_col: (i - ls + 1) as u32 });
         } else {
             let rest: String = ch[i..(i + 2).min(ch.len())].iter().collect();
             let sym = SYMS.iter().find(|s| rest.starts_with(**s)).ok_or((line, format!("unexpected character '{}'", c)))?;
@@ -82,9 +85,9 @@ pub fn lex(src: &str, start_line: u32) -> R<Vec<Token>> {
                 _ => {}
             }
             i += sym.len();
-            out.push(Token { tok: Tok::Sym(sym), line });
+            out.push(Token { tok: Tok::Sym(sym), line, col: (t0 - ls + 1) as u32, end_col: (i - ls + 1) as u32 });
         }
     }
-    out.push(Token { tok: Tok::Eof, line });
+    out.push(Token { tok: Tok::Eof, line, col: (i - ls + 1) as u32, end_col: (i - ls + 1) as u32 });
     Ok(out)
 }

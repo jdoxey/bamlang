@@ -1,7 +1,6 @@
 // A small structured IR between lowering and text emission.
-use crate::ast::Type;
-use crate::check::StructInfo;
-use std::collections::BTreeSet;
+use crate::ast::{Span, Type};
+use crate::check::{EnumInfo, StructInfo};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LTy { I64, I1, Ptr, Void, Token, Named(String) }
@@ -20,14 +19,15 @@ pub enum Inst {
     Bin { dst: usize, op: &'static str, a: Op, b: Op },
     Icmp { dst: usize, pred: &'static str, a: Op, b: Op },
     Field { dst: usize, sty: String, ptr: Op, idx: usize },
-    Elem { dst: usize, base: Op, idx: i64 },
-    Extract { dst: usize, ty: LTy, agg: Op, idx: usize },
-    Insert { dst: usize, ty: LTy, agg: Op, val: Op, idx: usize },
+    Extract { dst: usize, agg: Op, idx: Vec<usize> },
+    Insert { dst: usize, agg: Op, val: Op, idx: Vec<usize> },
+    Cast { dst: usize, op: &'static str, val: Op, to: LTy },
+    // llvm.instrprof.increment for counter `idx` of the current function (source-based coverage).
+    Prof { idx: u32 },
     Call(CallInfo),
     DbgDeclare { ptr: Op, var: usize },
-    Landing { dst: usize, catch: bool },
+    Landing { dst: usize },
     CleanupPad { dst: usize },
-    CatchPad { dst: usize, sw: usize },
 }
 
 #[derive(Debug)]
@@ -39,8 +39,6 @@ pub enum Term {
     Resume(Op),
     Invoke(CallInfo, String, String),
     CleanupRet(usize),
-    CatchRet(usize, String),
-    CatchSwitch { dst: usize, handler: String },
 }
 
 pub struct Block { pub label: String, pub insts: Vec<(Inst, u32)>, pub term: Option<(Term, u32)> }
@@ -57,12 +55,18 @@ pub struct Func {
     pub dbgvars: Vec<DbgVar>,
     pub eh: bool,
     pub line: u32,
+    pub ncounters: u32,
+    pub regions: Vec<Region>,
 }
+
+#[derive(Clone, Copy, Debug)]
+pub enum RKind { Code(u32), Branch(u32, u32) }
+#[derive(Clone, Copy, Debug)]
+pub struct Region { pub kind: RKind, pub span: Span }
 
 pub struct Module {
     pub structs: Vec<StructInfo>,
+    pub enums: Vec<EnumInfo>,
     pub funcs: Vec<Func>,
     pub strings: Vec<String>,
-    pub cov_lines: BTreeSet<u32>,
-    pub ranges: Vec<(String, u32, u32)>,
 }
