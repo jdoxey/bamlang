@@ -1,0 +1,14 @@
+[package]
+name = "k3c"
+version = "0.2.0"
+edition = "2021"
+description = "D8 spike K3: Rust compiler emitting C (with #line), driving clang"
+
+[[bin]]
+name = "k3c"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+opt-level = 2

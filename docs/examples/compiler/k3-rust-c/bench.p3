@@ -1,0 +1,25 @@
+# K3 micro-benchmark: 10 million calls of a function with one droppable local.
+# The drop has an observable branch so the optimiser cannot delete it.
+type Guard {
+  n: Int,
+  drop(mut self) {
+    if self.n == 5000000 {
+      print(text: "half way")
+    }
+  }
+}
+
+fn step(i: Int) -> Int {
+  let g = Guard(n: i)
+  return i + g.n
+}
+
+fn main() {
+  var total = 0
+  var i = 0
+  while i < 10000000 {
+    total += step(i: i)
+    i += 1
+  }
+  print(text: "total {total}")
+}

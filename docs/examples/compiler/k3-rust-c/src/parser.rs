@@ -13,8 +13,9 @@ pub fn parse_program(src: &str) -> R<Program> {
         let line = p.line();
         match p.ident()?.as_str() {
             "type" => prog.types.push(p.type_decl(line)?),
+            "enum" => prog.enums.push(p.enum_decl(line)?),
             "fn" => prog.fns.push(p.fn_decl(line)?),
-            other => return Err(format!("{}: expected 'type' or 'fn', found '{}'", line, other)),
+            other => return Err(format!("{}: expected 'type', 'enum' or 'fn', found '{}'", line, other)),
         }
     }
     Ok(prog)
@@ -23,6 +24,7 @@ pub fn parse_program(src: &str) -> R<Program> {
 impl Parser {
     fn peek(&self) -> &Tok { &self.toks[self.pos].tok }
     fn peek2(&self) -> &Tok { &self.toks[(self.pos + 1).min(self.toks.len() - 1)].tok }
+    fn peek_n(&self, n: usize) -> &Tok { &self.toks[(self.pos + n).min(self.toks.len() - 1)].tok }
     fn line(&self) -> u32 { self.toks[self.pos].line }
     fn next(&mut self) -> Tok { let t = self.toks[self.pos].tok.clone(); if self.pos + 1 < self.toks.len() { self.pos += 1; } t }
     fn is_sym(&self, s: &str) -> bool { matches!(self.peek(), Tok::Sym(x) if *x == s) }
@@ -65,6 +67,29 @@ impl Parser {
         }
         self.expect("}")?;
         Ok(TypeDecl { name, fields, drop, line })
+    }
+
+    fn enum_decl(&mut self, line: u32) -> R<EnumDecl> {
+        let name = self.ident()?;
+        self.expect("{")?;
+        let mut variants = Vec::new();
+        while !self.is_sym("}") {
+            let vname = self.ident()?;
+            let mut fields = Vec::new();
+            if self.eat_sym("(") {
+                while !self.is_sym(")") {
+                    let f = self.ident()?;
+                    self.expect(":")?;
+                    fields.push((f, self.ty()?));
+                    if !self.eat_sym(",") { break; }
+                }
+                self.expect(")")?;
+            }
+            variants.push(Variant { name: vname, fields });
+            self.eat_sym(",");
+        }
+        self.expect("}")?;
+        Ok(EnumDecl { name, variants, line })
     }
 
     fn fn_decl(&mut self, line: u32) -> R<FnDecl> {
@@ -112,6 +137,10 @@ impl Parser {
             self.next();
             let cond = self.expr()?;
             StmtKind::While { cond, body: self.block()? }
+        } else if self.is_kw("crew") {
+            self.next();
+            let name = self.ident()?;
+            StmtKind::Crew { name, body: self.block()? }
         } else if self.is_kw("return") {
             self.next();
             if self.is_sym("}") { StmtKind::Return(None) } else { StmtKind::Return(Some(self.expr()?)) }
@@ -174,30 +203,77 @@ impl Parser {
                 self.expect("(")?; self.expect(")")?;
                 Ok(Expr::new(ExprKind::Lambda(self.block()?), line))
             }
+            Tok::Ident(n) if n == "match" => {
+                let scrut = self.expr()?;
+                self.expect("{")?;
+                let mut arms = Vec::new();
+                while !self.is_sym("}") {
+                    let aline = self.line();
+                    let variant = self.ident()?;
+                    let mut binders = Vec::new();
+                    if self.eat_sym("(") {
+                        while !self.is_sym(")") {
+                            binders.push(self.ident()?);
+                            if !self.eat_sym(",") { break; }
+                        }
+                        self.expect(")")?;
+                    }
+                    self.expect("=>")?;
+                    let body = self.expr()?;
+                    arms.push(Arm { variant, binders, body, line: aline });
+                    self.eat_sym(",");
+                }
+                self.expect("}")?;
+                Ok(Expr::new(ExprKind::Match { scrut: Box::new(scrut), arms }, line))
+            }
             Tok::Ident(n) => {
-                if !self.is_sym("(") { return Ok(Expr::new(ExprKind::Var(n), line)); }
-                self.next();
-                let mut args = Vec::new();
-                while !self.is_sym(")") {
-                    if matches!(self.peek(), Tok::Ident(_)) && self.peek2() == &Tok::Sym(":") {
-                        let label = self.ident()?;
-                        self.next();
-                        args.push(Arg { label: Some(label), value: self.expr()? });
-                    } else {
-                        // pun: `area(p, ...)` means `p: p`
-                        let v = self.expr()?;
-                        match &v.kind {
-                            ExprKind::Var(name) => args.push(Arg { label: Some(name.clone()), value: v.clone() }),
-                            _ => return Err(format!("{}: argument needs a label", v.line)),
+                if self.is_sym(".") && self.peek_n(2) == &Tok::Sym("(") {
+                    if let Tok::Ident(v) = self.peek2().clone() {
+                        if v == "go" {
+                            self.next(); self.next(); self.next();
+                            let mut args = self.call_args()?;
+                            if args.len() != 1 || args[0].label.as_deref() != Some("task") { return Err(format!("{}: go(task: fn() {{...}})", line)); }
+                            let task = Box::new(args.remove(0).value);
+                            return Ok(Expr::new(ExprKind::Go { crew: n, task }, line));
+                        }
+                        if n.chars().next().map_or(false, |c| c.is_uppercase()) {
+                            self.next(); self.next(); self.next();
+                            let args = self.call_args()?;
+                            return Ok(Expr::new(ExprKind::EnumCtor { en: n, variant: v, args }, line));
                         }
                     }
-                    if !self.eat_sym(",") { break; }
                 }
-                self.expect(")")?;
+                if !self.is_sym("(") { return Ok(Expr::new(ExprKind::Var(n), line)); }
+                self.next();
+                let args = self.call_args()?;
                 Ok(Expr::new(ExprKind::Call { callee: n, args }, line))
             }
             t => Err(format!("{}: unexpected {:?} in expression", line, t)),
         }
+    }
+}
+
+impl Parser {
+    /// Arguments after the opening parenthesis, up to and including the closing one.
+    fn call_args(&mut self) -> R<Vec<Arg>> {
+        let mut args = Vec::new();
+        while !self.is_sym(")") {
+            if matches!(self.peek(), Tok::Ident(_)) && self.peek2() == &Tok::Sym(":") {
+                let label = self.ident()?;
+                self.next();
+                args.push(Arg { label: Some(label), value: self.expr()? });
+            } else {
+                // pun: `area(p, ...)` means `p: p`
+                let v = self.expr()?;
+                match &v.kind {
+                    ExprKind::Var(name) => args.push(Arg { label: Some(name.clone()), value: v.clone() }),
+                    _ => return Err(format!("{}: argument needs a label", v.line)),
+                }
+            }
+            if !self.eat_sym(",") { break; }
+        }
+        self.expect(")")?;
+        Ok(args)
     }
 }
 

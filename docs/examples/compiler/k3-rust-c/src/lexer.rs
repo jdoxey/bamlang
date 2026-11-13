@@ -5,7 +5,7 @@ pub enum Tok { Ident(String), Int(i64), Str(String), Sym(&'static str), Eof }
 #[derive(Clone, Debug)]
 pub struct Token { pub tok: Tok, pub line: u32 }
 
-const SYMS2: [&str; 3] = ["->", "==", "+="];
+const SYMS2: [&str; 4] = ["->", "==", "+=", "=>"];
 const SYMS1: [&str; 11] = ["{", "}", "(", ")", ",", ":", "+", "-", "*", "<", ">"];
 const SYMS1B: [&str; 2] = ["=", "."];
 

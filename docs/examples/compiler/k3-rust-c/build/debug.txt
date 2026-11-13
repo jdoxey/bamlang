@@ -1,4 +1,4 @@
-Breakpoint 1 at 0x11ea: file /home/jdoxey/Code/jdoxey/lang-repo/docs/examples/compiler/k3-rust-c/build/spike.p3, line 19.
+Breakpoint 1 at 0x125a: file /home/jdoxey/Code/jdoxey/lang-repo/docs/examples/compiler/k3-rust-c/build/spike.p3, line 19.
 [Thread debugging using libthread_db enabled]
 Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
 
@@ -9,5 +9,5 @@ $2 = 3
 total = 0
 i = 0
 #0  p3_area (p=..., scale=2) at /home/jdoxey/Code/jdoxey/lang-repo/docs/examples/compiler/k3-rust-c/build/spike.p3:19
-#1  0x00005555555553a0 in p3_main () at /home/jdoxey/Code/jdoxey/lang-repo/docs/examples/compiler/k3-rust-c/build/spike.p3:35
-#2  0x0000555555555454 in main () at /home/jdoxey/Code/jdoxey/lang-repo/docs/examples/compiler/k3-rust-c/build/spike.p3:50
+#1  0x00005555555553e0 in p3_main () at /home/jdoxey/Code/jdoxey/lang-repo/docs/examples/compiler/k3-rust-c/build/spike.p3:35
+#2  0x0000555555555524 in main () at /home/jdoxey/Code/jdoxey/lang-repo/docs/examples/compiler/k3-rust-c/build/spike.p3:50

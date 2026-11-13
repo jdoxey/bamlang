@@ -62,7 +62,7 @@ int64_t p3_depth(int64_t n) {
 #line 27 "spike.p3"
     if (n == 0) {
 #line 28 "spike.p3"
-        p3_trap("bottom reached");
+        p3_trap("bottom reached", "spike.p3", 28, "depth");
     }
 #line 30 "spike.p3"
     int64_t p3_ret = (p3_depth((n - 1)) + 1);
