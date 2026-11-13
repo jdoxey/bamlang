@@ -2,9 +2,9 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D9, modules, build and dependencies (G7). `docs/PLAN.md` (M0–M7) is written.
+- **Now:** D9 loop 2 (dependencies): fixing the review's findings in the B1 (Go-style) and B2 (pinned) prototypes.
 - **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes). Veto by opening an issue.
-- **Needs you:** nothing. Issue #3 answered (yes); your mitigations are in ADR-0002.
+- **Needs you (optional yes/no):** may CI download a SHA-pinned llvm-mingw (182 MB) to test replacing the 6–7 GB Visual Studio Build Tools on Windows? I recommend yes. Until then the default is system clang (D9 records it as interim).
 
 ## Next action
 
