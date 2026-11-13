@@ -2,7 +2,7 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** finishing ADR-0001 (memory model). Nothing is built yet.
+- **Now:** ADR-0001 (memory model): O9, owned values plus checked handles into pools, leads 85 to 71 after real code in C, C++ and Rust. A reviewer is attacking it before acceptance.
 - **Decided so far:** nothing final. Your rulings are in `docs/RULINGS.md`.
 - **Needs you:** nothing. To steer or veto, open a GitHub issue.
 
@@ -11,12 +11,12 @@
 Roadmap item **D1**, step 3 of the process: real examples.
 
 1. ~~Write `chatsim` in C from `docs/examples/chatsim/SPEC.md`. Put it in `docs/examples/chatsim/c/` with a `run.sh` that builds it and runs a script hitting every listed case. CI runs every `run.sh` on Linux, Windows and macOS, so use portable threads (Windows has no pthreads). Locally, also run it under AddressSanitizer.~~ Done 2026-11-13: `docs/examples/chatsim/c/`, green on all three OSes; clean under ASan, UBSan, LSan and TSan.
-2. Write its `room` and `user` parts in three models, in the closest real language, and run the same script:
+2. ~~Write its `room` and `user` parts in three models, in the closest real language, and run the same script:
    - **O1 pure ARC:** C++ with `shared_ptr` and `weak_ptr` for every object (Swift isn't packaged for Debian).
    - **O4 simplified ownership:** Rust, using moves plus `Rc` only where forced.
-   - **O9 owned values plus pool handles:** C with a generation-checked slot map.
-3. Record what each taught, against the cases in `docs/adr/0001-research/memory-cases.md`. Pay most attention to cases 12, 14, 20 and 25.
-4. Add a run-time transparency criterion (R6) to the rubric, re-score O1, O4 and O9, and have a separate reviewer attack the winner.
+   - **O9 owned values plus pool handles:** C with a generation-checked slot map.~~ Done: `o1-cpp/`, `o4-rust/`, `o9-c/`, green on all three OSes.
+3. ~~Record what each taught, against the cases in `docs/adr/0001-research/memory-cases.md`. Pay most attention to cases 12, 14, 20 and 25.~~ Done: `0001-research/chatsim-lessons.md`.
+4. ~~Add a run-time transparency criterion (R6) to the rubric, re-score O1, O4 and O9,~~ (O9 85, O4 71, O1 70; `rubric-v2.md`); **reviewer attack on O9 running now**, and have a separate reviewer attack the winner.
 5. Decide. Rewrite `docs/adr/0001-memory-management.md` down to under 300 lines with Status "Accepted", moving the history into `0001-research/`.
 
 Then continue down `docs/ROADMAP.md`.
