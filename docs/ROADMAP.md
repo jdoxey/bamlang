@@ -7,7 +7,7 @@ Work top to bottom. Tick an item when its ADR is Accepted or its milestone passe
 - [x] **D1 Memory model** (ADR-0001, Full). Accepted: owned values + borrows + pool handles (O9+).
 - [x] **D2 Generics and containers** (Full). Accepted: closed set of built-in parameterised types, no user generics (ADR-0002).
 - [x] **D3 Concurrency model** (Full). Accepted: OS threads, moves, channels, mutex owning its data (ADR-0003).
-- [ ] **D4 Errors and absence** (Full). Exceptions, results or error values. Whether anything can be null.
+- [x] **D4 Errors and absence** (Full). Accepted: no null, Optional/Result, `?`, panic for bugs (ADR-0004).
 - [ ] **D5 Types and OO** (Full). Methods with implicit `self`, interfaces, and whether inheritance exists.
 - [ ] **D6 Core syntax** (Full). Statement endings without semicolons or indentation rules (G5), blocks, declarations, naming. Produce a corpus of example programs that become the syntax tests.
 - [ ] **D7 DSL and declarative layout** (Full). The mechanism for G11 without macros or annotations.
