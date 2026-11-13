@@ -1,0 +1,4 @@
+# expect: 4: expected an expression, found '}'
+fn f() {
+  let x = 1 +
+}

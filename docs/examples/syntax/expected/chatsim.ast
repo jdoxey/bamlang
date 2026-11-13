@@ -1,0 +1,1411 @@
+(file
+  (use std.sync)
+  (use std.text as text)
+  (const RATE_LIMIT
+    (int 3))
+  (type User
+    (field name pub
+      (t Str))
+    (field room
+      (t Optional
+        (t Handle
+          (t Room))))
+    (field last_from
+      (t Optional
+        (t Handle
+          (t User))))
+    (field had_contact
+      (t Bool)
+      (default
+        (bool false)))
+    (field is_bot
+      (t Bool)
+      (default
+        (bool false)))
+    (drop
+      (recv mut)
+      (block
+        (call
+          (name print)
+          (interp
+            (s "user ")
+            (part
+              (field name
+                (name self)))
+            (s " dropped"))))))
+  (type Member
+    (field user
+      (t Handle
+        (t User)))
+    (field cb
+      (fnt
+        (mut
+          (t Server))
+        (t Handle
+          (t Room))
+        (t Handle
+          (t User))
+        (t Str))))
+  (type Room
+    (field name
+      (t Str))
+    (field members
+      (t List
+        (t Member))
+      (default
+        (list)))
+    (field history
+      (t List
+        (t Str))
+      (default
+        (list)))
+    (fn remove_member
+      (recv mut)
+      (param u
+        (t Handle
+          (t User)))
+      (block
+        (var i
+          (int 0))
+        (while
+          (bin <
+            (name i)
+            (mcall len
+              (field members
+                (name self))))
+          (block
+            (if
+              (bin ==
+                (field user
+                  (index
+                    (field members
+                      (name self))
+                    (name i)))
+                (name u))
+              (block
+                (mcall remove_at
+                  (field members
+                    (name self))
+                  (name i))
+                (break)))
+            (opassign +
+              (name i)
+              (int 1)))))))
+  (type Timer
+    (field due
+      (t Int))
+    (field user
+      (t Optional
+        (t Handle
+          (t User))))
+    (field user_name
+      (t Str))
+    (field text
+      (t Str)))
+  (type RateEntry
+    (field tick
+      (t Int))
+    (field count
+      (t Int)))
+  (type Job
+    (field room_name
+      (t Str))
+    (field history
+      (t List
+        (t Str))))
+  (type Stats
+    (field messages
+      (t Int)
+      (default
+        (int 0)))
+    (field archived_rooms
+      (t Int)
+      (default
+        (int 0)))
+    (field archived_messages
+      (t Int)
+      (default
+        (int 0)))
+    (field archive
+      (t List
+        (t Str))
+      (default
+        (list))))
+  (type Server
+    (field users
+      (t Pool
+        (t User))
+      (default
+        (call
+          (t Pool
+            (t User)))))
+    (field rooms
+      (t Pool
+        (t Room))
+      (default
+        (call
+          (t Pool
+            (t Room)))))
+    (field timers
+      (t List
+        (t Timer))
+      (default
+        (list)))
+    (field rates
+      (t Map
+        (t Str)
+        (t RateEntry))
+      (default
+        (call
+          (t Map
+            (t Str)
+            (t RateEntry)))))
+    (field clock
+      (t Int)
+      (default
+        (int 0)))
+    (field jobs
+      (t Channel
+        (t Job)))
+    (field stats
+      (t Mutex
+        (t Stats)))
+    (fn find_user
+      (recv self)
+      (param name
+        (t Str))
+      (ret
+        (t Optional
+          (t Handle
+            (t User))))
+      (block
+        (for
+          (pbind h)
+          (mcall handles
+            (field users
+              (name self)))
+          (block
+            (if
+              (bin ==
+                (field name
+                  (index
+                    (field users
+                      (name self))
+                    (name h)))
+                (name name))
+              (block
+                (return
+                  (call
+                    (name some)
+                    (name h)))))))
+        (return
+          (none))))
+    (fn find_room
+      (recv self)
+      (param name
+        (t Str))
+      (ret
+        (t Optional
+          (t Handle
+            (t Room))))
+      (block
+        (for
+          (pbind h)
+          (mcall handles
+            (field rooms
+              (name self)))
+          (block
+            (if
+              (bin ==
+                (field name
+                  (index
+                    (field rooms
+                      (name self))
+                    (name h)))
+                (name name))
+              (block
+                (return
+                  (call
+                    (name some)
+                    (name h)))))))
+        (return
+          (none))))
+    (fn rate_ok
+      (recv mut)
+      (param name
+        (t Str))
+      (ret
+        (t Bool))
+      (block
+        (if
+          (un not
+            (mcall contains
+              (field rates
+                (name self))
+              (name name)))
+          (block
+            (assign
+              (index
+                (field rates
+                  (name self))
+                (name name))
+              (call
+                (name RateEntry)
+                (named tick
+                  (field clock
+                    (name self)))
+                (named count
+                  (int 0))))))
+        (with e
+          (index
+            (field rates
+              (name self))
+            (name name))
+          (block
+            (if
+              (bin !=
+                (field tick
+                  (name e))
+                (field clock
+                  (name self)))
+              (block
+                (assign
+                  (field tick
+                    (name e))
+                  (field clock
+                    (name self)))
+                (assign
+                  (field count
+                    (name e))
+                  (int 0))))
+            (if
+              (bin >=
+                (field count
+                  (name e))
+                (name RATE_LIMIT))
+              (block
+                (call
+                  (name print)
+                  (interp
+                    (s "rate limited: ")
+                    (part
+                      (name name))))
+                (return
+                  (bool false))))
+            (opassign +
+              (field count
+                (name e))
+              (int 1))))
+        (return
+          (bool true))))
+    (fn bump
+      (recv self)
+      (param n
+        (t Int))
+      (block
+        (lock
+          (field stats
+            (name self))
+          (block
+            (opassign +
+              (field messages
+                (field stats
+                  (name self)))
+              (name n))))))
+    (fn post
+      (recv mut)
+      (param room
+        (t Handle
+          (t Room)))
+      (param from
+        (t Handle
+          (t User)))
+      (param text
+        (t Str))
+      (block
+        (let who
+          (field name
+            (index
+              (field users
+                (name self))
+              (name from))))
+        (mcall push
+          (field history
+            (index
+              (field rooms
+                (name self))
+              (name room)))
+          (interp
+            (part
+              (name who))
+            (s ": ")
+            (part
+              (name text))))
+        (mcall bump
+          (name self)
+          (int 1))
+        (call
+          (name print)
+          (interp
+            (s "#")
+            (part
+              (field name
+                (index
+                  (field rooms
+                    (name self))
+                  (name room))))
+            (s " ")
+            (part
+              (name who))
+            (s ": ")
+            (part
+              (name text))))
+        (var i
+          (int 0))
+        (while
+          (bin <
+            (name i)
+            (mcall len
+              (field members
+                (index
+                  (field rooms
+                    (name self))
+                  (name room)))))
+          (block
+            (let m
+              (index
+                (field members
+                  (index
+                    (field rooms
+                      (name self))
+                    (name room)))
+                (name i)))
+            (if
+              (bin !=
+                (field user
+                  (name m))
+                (name from))
+              (block
+                (mcall cb
+                  (name m)
+                  (name self)
+                  (name room)
+                  (name from)
+                  (name text))))
+            (opassign +
+              (name i)
+              (int 1))))))
+    (fn open_room
+      (recv mut)
+      (param name
+        (t Str))
+      (ret
+        (t Handle
+          (t Room)))
+      (block
+        (call
+          (name print)
+          (interp
+            (s "#")
+            (part
+              (name name))
+            (s " opened")))
+        (return
+          (mcall add
+            (field rooms
+              (name self))
+            (call
+              (name Room)
+              (named name
+                (mcall copy
+                  (name name))))))))
+    (fn enter_room
+      (recv mut)
+      (param u
+        (t Handle
+          (t User)))
+      (param room_name
+        (t Str))
+      (block
+        (let r
+          (iflet found
+            (mcall find_room
+              (name self)
+              (name room_name))
+            (block
+              (name found))
+            (else
+              (block
+                (mcall open_room
+                  (name self)
+                  (name room_name))))))
+        (let cb
+          (if
+            (field is_bot
+              (index
+                (field users
+                  (name self))
+                (name u)))
+            (block
+              (lambda
+                (param srv)
+                (param room)
+                (param from)
+                (param text)
+                (block
+                  (call
+                    (name print)
+                    (interp
+                      (s "  ")
+                      (part
+                        (field name
+                          (index
+                            (field users
+                              (name srv))
+                            (name u))))
+                      (s " sees ")
+                      (part
+                        (field name
+                          (index
+                            (field users
+                              (name srv))
+                            (name from))))
+                      (s ": ")
+                      (part
+                        (name text))))
+                  (if
+                    (un not
+                      (field is_bot
+                        (index
+                          (field users
+                            (name srv))
+                          (name from))))
+                    (block
+                      (mcall post
+                        (name srv)
+                        (name room)
+                        (name u)
+                        (interp
+                          (s "echo: ")
+                          (part
+                            (name text)))))))))
+            (else
+              (block
+                (lambda
+                  (param srv)
+                  (param room)
+                  (param from)
+                  (param text)
+                  (block
+                    (call
+                      (name print)
+                      (interp
+                        (s "  ")
+                        (part
+                          (field name
+                            (index
+                              (field users
+                                (name srv))
+                              (name u))))
+                        (s " sees ")
+                        (part
+                          (field name
+                            (index
+                              (field users
+                                (name srv))
+                              (name from))))
+                        (s ": ")
+                        (part
+                          (name text))))))))))
+        (mcall push
+          (field members
+            (index
+              (field rooms
+                (name self))
+              (name r)))
+          (call
+            (name Member)
+            (named user
+              (name u))
+            (named cb
+              (name cb))))
+        (assign
+          (field room
+            (index
+              (field users
+                (name self))
+              (name u)))
+          (call
+            (name some)
+            (name r)))
+        (call
+          (name print)
+          (interp
+            (part
+              (field name
+                (index
+                  (field users
+                    (name self))
+                  (name u))))
+            (s " joined #")
+            (part
+              (field name
+                (index
+                  (field rooms
+                    (name self))
+                  (name r))))))))
+    (fn exit_room
+      (recv mut)
+      (param u
+        (t Handle
+          (t User)))
+      (block
+        (iflet r
+          (field room
+            (index
+              (field users
+                (name self))
+              (name u)))
+          (block
+            (mcall remove_member
+              (index
+                (field rooms
+                  (name self))
+                (name r))
+              (name u))
+            (assign
+              (field room
+                (index
+                  (field users
+                    (name self))
+                  (name u)))
+              (none))
+            (call
+              (name print)
+              (interp
+                (part
+                  (field name
+                    (index
+                      (field users
+                        (name self))
+                      (name u))))
+                (s " left #")
+                (part
+                  (field name
+                    (index
+                      (field rooms
+                        (name self))
+                      (name r))))))
+            (if
+              (mcall is_empty
+                (field members
+                  (index
+                    (field rooms
+                      (name self))
+                    (name r))))
+              (block
+                (let room
+                  (mcall unwrap
+                    (mcall take_out
+                      (field rooms
+                        (name self))
+                      (name r))))
+                (call
+                  (name print)
+                  (interp
+                    (s "#")
+                    (part
+                      (field name
+                        (name room)))
+                    (s " closed, ")
+                    (part
+                      (mcall len
+                        (field history
+                          (name room))))
+                    (s " messages sent to archive")))
+                (mcall send
+                  (field jobs
+                    (name self))
+                  (call
+                    (name Job)
+                    (named room_name
+                      (field name
+                        (name room)))
+                    (named history
+                      (field history
+                        (name room)))))))))))
+    (fn free_user
+      (recv mut)
+      (param u
+        (t Handle
+          (t User)))
+      (block
+        (for
+          (pbind h)
+          (mcall handles
+            (field users
+              (name self)))
+          (block
+            (if
+              (bin ==
+                (field last_from
+                  (index
+                    (field users
+                      (name self))
+                    (name h)))
+                (call
+                  (name some)
+                  (name u)))
+              (block
+                (assign
+                  (field last_from
+                    (index
+                      (field users
+                        (name self))
+                      (name h)))
+                  (none))))))
+        (for
+          (pbind i)
+          (bin ..
+            (int 0)
+            (mcall len
+              (field timers
+                (name self))))
+          (block
+            (if
+              (bin ==
+                (field user
+                  (index
+                    (field timers
+                      (name self))
+                    (name i)))
+                (call
+                  (name some)
+                  (name u)))
+              (block
+                (assign
+                  (field user
+                    (index
+                      (field timers
+                        (name self))
+                      (name i)))
+                  (none))))))
+        (mcall remove
+          (field rates
+            (name self))
+          (field name
+            (index
+              (field users
+                (name self))
+              (name u))))
+        (mcall remove
+          (field users
+            (name self))
+          (name u))))
+    (fn cmd_join
+      (recv mut)
+      (param name
+        (t Str))
+      (param room
+        (t Str))
+      (block
+        (if
+          (bin !=
+            (mcall find_user
+              (name self)
+              (name name))
+            (none))
+          (block
+            (call
+              (name print)
+              (interp
+                (s "join failed: ")
+                (part
+                  (name name))
+                (s " is already here")))
+            (return)))
+        (let u
+          (mcall add
+            (field users
+              (name self))
+            (call
+              (name User)
+              (named name
+                (mcall copy
+                  (name name)))
+              (named room
+                (none))
+              (named last_from
+                (none))
+              (named is_bot
+                (bin ==
+                  (name name)
+                  (str "echobot"))))))
+        (mcall enter_room
+          (name self)
+          (name u)
+          (name room))))
+    (fn cmd_say
+      (recv mut)
+      (param name
+        (t Str))
+      (param text
+        (t Str))
+      (block
+        (iflet u
+          (mcall find_user
+            (name self)
+            (name name))
+          (block
+            (if
+              (un not
+                (mcall rate_ok
+                  (name self)
+                  (name name)))
+              (block
+                (return)))
+            (iflet r
+              (field room
+                (index
+                  (field users
+                    (name self))
+                  (name u)))
+              (block
+                (mcall post
+                  (name self)
+                  (name r)
+                  (name u)
+                  (name text)))))
+          (else
+            (block
+              (call
+                (name print)
+                (interp
+                  (s "say failed: ")
+                  (part
+                    (name name))
+                  (s " is not here"))))))))
+    (fn deliver_dm
+      (recv mut)
+      (param from
+        (t Handle
+          (t User)))
+      (param dest
+        (t Handle
+          (t User)))
+      (param text
+        (t Str))
+      (block
+        (let fname
+          (field name
+            (index
+              (field users
+                (name self))
+              (name from))))
+        (let dname
+          (field name
+            (index
+              (field users
+                (name self))
+              (name dest))))
+        (call
+          (name print)
+          (interp
+            (s "dm ")
+            (part
+              (name fname))
+            (s " -> ")
+            (part
+              (name dname))
+            (s ": ")
+            (part
+              (name text))))
+        (call
+          (name print)
+          (interp
+            (s "  ")
+            (part
+              (name dname))
+            (s " sees dm from ")
+            (part
+              (name fname))
+            (s ": ")
+            (part
+              (name text))))
+        (assign
+          (field last_from
+            (index
+              (field users
+                (name self))
+              (name dest)))
+          (call
+            (name some)
+            (name from)))
+        (assign
+          (field had_contact
+            (index
+              (field users
+                (name self))
+              (name dest)))
+          (bool true))
+        (mcall bump
+          (name self)
+          (int 1))))
+    (fn cmd_dm
+      (recv mut)
+      (param from_name
+        (t Str))
+      (param to_name
+        (t Str))
+      (param text
+        (t Str))
+      (block
+        (match
+          (tuple
+            (mcall find_user
+              (name self)
+              (name from_name))
+            (mcall find_user
+              (name self)
+              (name to_name)))
+          (arm
+            (ptuple
+              (plit
+                (none))
+              (pwild))
+            (call
+              (name print)
+              (interp
+                (s "dm failed: ")
+                (part
+                  (name from_name))
+                (s " is not here"))))
+          (arm
+            (ptuple
+              (pwild)
+              (plit
+                (none)))
+            (call
+              (name print)
+              (interp
+                (s "dm failed: ")
+                (part
+                  (name to_name))
+                (s " is not here"))))
+          (arm
+            (ptuple
+              (pvariant some
+                (pbind f))
+              (pvariant some
+                (pbind d)))
+            (block
+              (if
+                (mcall rate_ok
+                  (name self)
+                  (name from_name))
+                (block
+                  (mcall deliver_dm
+                    (name self)
+                    (name f)
+                    (name d)
+                    (name text)))))))))
+    (fn cmd_remind
+      (recv mut)
+      (param name
+        (t Str))
+      (param delay
+        (t Int))
+      (param text
+        (t Str))
+      (block
+        (iflet u
+          (mcall find_user
+            (name self)
+            (name name))
+          (block
+            (let due
+              (bin +
+                (field clock
+                  (name self))
+                (name delay)))
+            (var i
+              (int 0))
+            (while
+              (bin and
+                (bin <
+                  (name i)
+                  (mcall len
+                    (field timers
+                      (name self))))
+                (bin <=
+                  (field due
+                    (index
+                      (field timers
+                        (name self))
+                      (name i)))
+                  (name due)))
+              (block
+                (opassign +
+                  (name i)
+                  (int 1))))
+            (mcall insert
+              (field timers
+                (name self))
+              (name i)
+              (call
+                (name Timer)
+                (named due
+                  (name due))
+                (named user
+                  (call
+                    (name some)
+                    (name u)))
+                (named user_name
+                  (mcall copy
+                    (name name)))
+                (named text
+                  (mcall copy
+                    (name text)))))
+            (call
+              (name print)
+              (interp
+                (s "reminder for ")
+                (part
+                  (name name))
+                (s " set for tick ")
+                (part
+                  (name due)))))
+          (else
+            (block
+              (call
+                (name print)
+                (interp
+                  (s "remind failed: ")
+                  (part
+                    (name name))
+                  (s " is not here"))))))))
+    (fn cmd_tick
+      (recv mut)
+      (param n
+        (t Int))
+      (block
+        (for
+          (pwild)
+          (bin ..
+            (int 0)
+            (name n))
+          (block
+            (opassign +
+              (field clock
+                (name self))
+              (int 1))
+            (while
+              (bin and
+                (bin >
+                  (mcall len
+                    (field timers
+                      (name self)))
+                  (int 0))
+                (bin <=
+                  (field due
+                    (index
+                      (field timers
+                        (name self))
+                      (int 0)))
+                  (field clock
+                    (name self))))
+              (block
+                (let t
+                  (mcall remove_at
+                    (field timers
+                      (name self))
+                    (int 0)))
+                (match
+                  (field user
+                    (name t))
+                  (arm
+                    (pvariant some
+                      (pbind h))
+                    (call
+                      (name print)
+                      (interp
+                        (s "reminder for ")
+                        (part
+                          (field name
+                            (index
+                              (field users
+                                (name self))
+                              (name h))))
+                        (s ": ")
+                        (part
+                          (field text
+                            (name t))))))
+                  (arm
+                    (plit
+                      (none))
+                    (call
+                      (name print)
+                      (interp
+                        (s "reminder for ")
+                        (part
+                          (field user_name
+                            (name t)))
+                        (s " dropped: user has left")))))))))
+        (call
+          (name print)
+          (interp
+            (s "clock is ")
+            (part
+              (field clock
+                (name self)))))))
+    (fn cmd_move
+      (recv mut)
+      (param name
+        (t Str))
+      (param room
+        (t Str))
+      (block
+        (iflet u
+          (mcall find_user
+            (name self)
+            (name name))
+          (block
+            (mcall exit_room
+              (name self)
+              (name u))
+            (mcall enter_room
+              (name self)
+              (name u)
+              (name room)))
+          (else
+            (block
+              (call
+                (name print)
+                (interp
+                  (s "move failed: ")
+                  (part
+                    (name name))
+                  (s " is not here"))))))))
+    (fn cmd_leave
+      (recv mut)
+      (param name
+        (t Str))
+      (block
+        (iflet u
+          (mcall find_user
+            (name self)
+            (name name))
+          (block
+            (mcall exit_room
+              (name self)
+              (name u))
+            (mcall free_user
+              (name self)
+              (name u)))
+          (else
+            (block
+              (call
+                (name print)
+                (interp
+                  (s "leave failed: ")
+                  (part
+                    (name name))
+                  (s " is not here"))))))))
+    (fn cmd_stats
+      (recv self)
+      (block
+        (mcall flush
+          (field jobs
+            (name self)))
+        (lock
+          (field stats
+            (name self))
+          (block
+            (call
+              (name print)
+              (interp
+                (s "stats: users=")
+                (part
+                  (mcall len
+                    (field users
+                      (name self))))
+                (s " rooms=")
+                (part
+                  (mcall len
+                    (field rooms
+                      (name self)))))
+              (interp
+                (s " messages=")
+                (part
+                  (field messages
+                    (field stats
+                      (name self)))))
+              (interp
+                (s " archived_rooms=")
+                (part
+                  (field archived_rooms
+                    (field stats
+                      (name self))))))
+            (for
+              (pbind line)
+              (field archive
+                (field stats
+                  (name self)))
+              (block
+                (call
+                  (name print)
+                  (interp
+                    (s "  archive ")
+                    (part
+                      (name line))))))))))
+    (fn handle
+      (recv mut)
+      (param line
+        (t Str))
+      (block
+        (let w
+          (mcall split
+            (name line)
+            (str " ")))
+        (match
+          (index
+            (name w)
+            (int 0))
+          (arm
+            (plit
+              (str "join"))
+            (mcall cmd_join
+              (name self)
+              (index
+                (name w)
+                (int 1))
+              (index
+                (name w)
+                (int 2))))
+          (arm
+            (plit
+              (str "say"))
+            (mcall cmd_say
+              (name self)
+              (index
+                (name w)
+                (int 1))
+              (mcall join
+                (mcall rest
+                  (name w)
+                  (int 2))
+                (str " "))))
+          (arm
+            (plit
+              (str "dm"))
+            (mcall cmd_dm
+              (name self)
+              (index
+                (name w)
+                (int 1))
+              (index
+                (name w)
+                (int 2))
+              (mcall join
+                (mcall rest
+                  (name w)
+                  (int 3))
+                (str " "))))
+          (arm
+            (plit
+              (str "remind"))
+            (mcall cmd_remind
+              (name self)
+              (index
+                (name w)
+                (int 1))
+              (mcall unwrap
+                (mcall to_int
+                  (index
+                    (name w)
+                    (int 2))))
+              (mcall join
+                (mcall rest
+                  (name w)
+                  (int 3))
+                (str " "))))
+          (arm
+            (plit
+              (str "tick"))
+            (mcall cmd_tick
+              (name self)
+              (mcall unwrap
+                (mcall to_int
+                  (index
+                    (name w)
+                    (int 1))))))
+          (arm
+            (plit
+              (str "move"))
+            (mcall cmd_move
+              (name self)
+              (index
+                (name w)
+                (int 1))
+              (index
+                (name w)
+                (int 2))))
+          (arm
+            (plit
+              (str "leave"))
+            (mcall cmd_leave
+              (name self)
+              (index
+                (name w)
+                (int 1))))
+          (arm
+            (plit
+              (str "stats"))
+            (mcall cmd_stats
+              (name self)))
+          (arm
+            (pwild)
+            (call
+              (name print)
+              (interp
+                (s "bad command: ")
+                (part
+                  (index
+                    (name w)
+                    (int 0))))))))))
+  (fn archive_worker
+    (param jobs
+      (t Channel
+        (t Job)))
+    (param stats
+      (t Mutex
+        (t Stats)))
+    (block
+      (while
+        (bool true)
+        (block
+          (iflet job
+            (mcall recv
+              (name jobs))
+            (block
+              (call
+                (name sleep_ms)
+                (int 20))
+              (var bytes
+                (int 0))
+              (for
+                (pbind line)
+                (field history
+                  (name job))
+                (block
+                  (opassign +
+                    (name bytes)
+                    (mcall len
+                      (name line)))))
+              (let n
+                (mcall len
+                  (field history
+                    (name job))))
+              (let entry
+                (interp
+                  (part
+                    (field room_name
+                      (name job)))
+                  (s ": ")
+                  (part
+                    (name n))
+                  (s " messages, ")
+                  (part
+                    (name bytes))
+                  (s " bytes")))
+              (lock
+                (name stats)
+                (block
+                  (opassign +
+                    (field archived_rooms
+                      (name stats))
+                    (int 1))
+                  (opassign +
+                    (field archived_messages
+                      (name stats))
+                    (name n))
+                  (mcall push
+                    (field archive
+                      (name stats))
+                    (name entry)))))
+            (else
+              (block
+                (break))))))))
+  (fn main fails
+    (block
+      (let jobs
+        (call
+          (t Channel
+            (t Job))))
+      (let stats
+        (call
+          (name Mutex)
+          (call
+            (name Stats))))
+      (var srv
+        (call
+          (name Server)
+          (named jobs
+            (name jobs))
+          (named stats
+            (name stats))))
+      (try-or e
+        (crew c
+          (block
+            (mcall go
+              (name c)
+              (lambda
+                (call
+                  (name archive_worker)
+                  (name jobs)
+                  (name stats))))
+            (for
+              (pbind line)
+              (mcall lines
+                (name stdin))
+              (block
+                (if
+                  (bin or
+                    (mcall is_empty
+                      (name line))
+                    (mcall starts_with
+                      (name line)
+                      (str "#")))
+                  (block
+                    (continue)))
+                (call
+                  (name print)
+                  (interp
+                    (s "> ")
+                    (part
+                      (name line))))
+                (mcall handle
+                  (name srv)
+                  (name line))))
+            (mcall close
+              (name jobs))))
+        (block
+          (call
+            (name print)
+            (interp
+              (s "fatal: ")
+              (part
+                (name e))))))
+      (call
+        (name print)
+        (interp
+          (s "exit: alive users=")
+          (part
+            (mcall len
+              (field users
+                (name srv))))
+          (s " rooms=")
+          (part
+            (mcall len
+              (field rooms
+                (name srv)))))))))
