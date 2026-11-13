@@ -35,6 +35,7 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
 - **Opus (the main session):** criteria, choosing between options, reviews, writing ADRs, and any compiler code where a bug would be silent.
 - **Sonnet (subagents, `model: sonnet`):** research and note-taking, generating option write-ups, writing example programs to a spec you give, test scripts, CI fixes and other mechanical edits.
 - **Reviewer subagents use Opus.** A weaker reviewer misses the counterexamples.
+- **Until 2026-11-16 only: adversarial reviewers use Fable 5.2** (John's Pro account has it until 17 November). It costs about 2× Opus 5.5 per token ($8/$40 vs $4/$20 per million), and Pro caps it at 50% of the weekly limit, so only the step-4 review of each Full-tier decision uses it. Research, ideas and example code stay on Sonnet, and the main session stays on Opus. From 2026-11-17, reviewers go back to Opus.
 - When unsure, ask whether a mistake would be caught by a compiler or test. If yes, Sonnet. If no, Opus.
 
 ## Budget rules (Pro plan)
@@ -64,6 +65,7 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
 ## Changelog
 
 - 2026-11-13: lesson from ADR-0001's retro (second example).
+- 2026-11-13: Fable 5.2 for adversarial reviews until 2026-11-16 (John's message).
 - 2026-11-13: lesson from ADR-0006's retro (a parser per option, one shared AST).
 - 2026-11-13: lesson from ADR-0005's retro (the clarification pass).
 - 2026-11-13: lesson from ADR-0004's retro (model the design, not the host).
