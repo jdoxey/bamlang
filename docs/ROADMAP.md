@@ -8,7 +8,7 @@ Work top to bottom. Tick an item when its ADR is Accepted or its milestone passe
 - [x] **D2 Generics and containers** (Full). Accepted: closed set of built-in parameterised types, no user generics (ADR-0002).
 - [x] **D3 Concurrency model** (Full). Accepted: OS threads, moves, channels, mutex owning its data (ADR-0003).
 - [x] **D4 Errors and absence** (Full). Accepted: no null, Optional/Result, `?`, panic for bugs (ADR-0004).
-- [ ] **D5 Types and OO** (Full). Methods with implicit `self`, interfaces, and whether inheritance exists.
+- [x] **D5 Types and OO** (Full). Accepted: `type` with methods and implicit `self`, `enum`, structural `interface`, no inheritance (ADR-0005).
 - [ ] **D6 Core syntax** (Full). Statement endings without semicolons or indentation rules (G5), blocks, declarations, naming. Produce a corpus of example programs that become the syntax tests.
 - [ ] **D7 DSL and declarative layout** (Full). The mechanism for G11 without macros or annotations.
 - [ ] **D8 Compiler implementation** (Full). Host language, backend, debug info (G8) and coverage (G9) on all three OSes.
