@@ -2,22 +2,22 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D3, the concurrency model (what crosses threads, how shared state is guarded).
-- **Decided:** ADR-0001 memory model (owned values, moves, checked handles into pools) and ADR-0002 containers (a frozen built-in set like `List of Employee`; users never write type parameters). Veto by opening an issue.
+- **Now:** D4, errors and absence (exceptions, results or error values; can anything be null).
+- **Decided:** ADR-0001 memory (owned values, moves, checked handles into pools), ADR-0002 containers (a built-in set like `List of Employee`; no user type parameters), ADR-0003 concurrency (scoped `crew` threads, owned channels, no async). Veto by opening an issue.
 - **Needs you:** issue #3, a yes/no on whether G3 allows built-in `List of T`-style types. I'm carrying on assuming yes.
 
 ## Next action
 
-Roadmap item **D3** (ADR-0003, Full). Inputs:
-- ADR-0001 rule 6: values move into threads, `Mutex of T` with `lock`, re-lock traps, and module state is main-thread only, inferred over the call graph.
-- ADR-0002: `Channel`, `Mutex` and `Atomic` are in the frozen set; `take` parameters; escaping closures.
+Roadmap item **D4** (ADR-0004, Full). Inputs:
+- ADR-0001 has traps (stale `pool[h]`, exclusivity, wrong pool) and `if x = … else`.
+- ADR-0002 put `Optional` and `Result` in the built-in set, with sum types and exhaustive `match`.
+- ADR-0003: crews re-raise the first child error ("plus N more"); a cancelled call returns its closed result.
+- Decide: errors as values vs exceptions vs both; whether traps can be caught; error propagation syntax (G4); what `none` is; how errors cross a crew; the error type (closed set? user enums?).
 
-1. Step 1: research 4-8 languages' thread models (Go, Rust, Swift actors, Erlang, Pony, Java, C#, Zig), with what went wrong. Save notes in `docs/adr/0003-research/`.
-2. Step 2: criteria first (include R6), then 6 sane and 4 crazy ideas, plus combinations.
-3. Step 3: write the top 3 as real code on chatsim's worker and stats, or on a new threaded benchmark, with `run.sh`, green on all three OSes.
-4. Step 4: an Opus reviewer attacks the winner; score with a script; decide; ADR under 300 lines.
-
-Then continue down `docs/ROADMAP.md`.
+1. Step 1: research (Go, Rust, Swift, Zig, Java/Kotlin, C++ expected/exceptions, Odin, Midori/Joe Duffy's error model), with what went wrong.
+2. Step 2: criteria first, then 6 sane and 4 crazy ideas, plus combinations.
+3. Step 3: write the top 3 as real code. Use chatsim's error paths, or a new `errors` benchmark (a parser plus file I/O plus a crew), with `run.sh` on all three OSes.
+4. Step 4: an Opus reviewer attacks the winner; scores by script; decide; ADR under 300 lines.
 
 ## Open questions carried forward
 
@@ -39,5 +39,6 @@ Nothing.
 
 - 2026-11-13: repo set up from the planning conversation.
 - 2026-11-13: first run on Sonnet skipped the real-examples step. John reset `main`; that work is on the `sonnet-attempt` branch for reference only.
+- 2026-11-13: ADR-0003 Accepted (a tie broken by the examples and reversibility after one review loop).
 - 2026-11-13: ADR-0002 Accepted after two review loops (a tie broken by the examples and reversibility). OCaml added to CI on Linux and macOS.
 - 2026-11-13: chatsim in C, Swift (O1), Rust (O4) and C (O9); widgets under O9-S. Opus review found a fatal hole in O9, fixed as O9-S. ADR-0001 Accepted. Issues #1 and #2 handled and closed.

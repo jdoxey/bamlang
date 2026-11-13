@@ -1,6 +1,6 @@
 # ADR-0003: Concurrency model
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Tier:** Full (see `docs/PROCESS.md`)
 - **Examples:** `docs/examples/threads` (F1 crew in `f1-crew/`; rivals in `f2-scope-spawn/`, `f3-offload/`)
@@ -74,6 +74,8 @@ See `0003-research/lessons-and-scores.md`. All three were modelled in Rust and p
   **F3** was shortest but needed 118 lines of hidden machinery, and custom pipelines fell back to raw channels.
 - **F1's revised example** (loop 2) runs the main loop inside a crew, with per-job cancellation. A self-test shows
   error aggregation ("plus N more"), cancellation filtering, cancel on early exit, and the lock traps.
+- **Not checkable in the Rust model:** freezing (rule 3), the closure-capture rule (4) and the borrow scope (2).
+  `f1-crew/crew.txt` gives the real language's expected errors for each, and they become conformance tests in M5.
 
 ## Decision
 

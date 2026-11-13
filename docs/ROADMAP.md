@@ -6,7 +6,7 @@ Work top to bottom. Tick an item when its ADR is Accepted or its milestone passe
 
 - [x] **D1 Memory model** (ADR-0001, Full). Accepted 2026-11-13: O9-S, owned values plus checked handles into pools.
 - [x] **D2 Generics and containers** (Full). ADR-0002 Accepted 2026-11-13: a frozen built-in set, no user type parameters (pending issue #3).
-- [ ] **D3 Concurrency model** (Full). Threads are in v1 (R1). What crosses threads, and how is shared state guarded?
+- [x] **D3 Concurrency model** (Full). ADR-0003 Accepted 2026-11-13: scoped crews, owned channels, lock and blocking traps, no async.
 - [ ] **D4 Errors and absence** (Full). Exceptions, results or error values. Whether anything can be null.
 - [ ] **D5 Types and OO** (Full). Methods with implicit `self`, interfaces, and whether inheritance exists.
 - [ ] **D6 Core syntax** (Full). Statement endings without semicolons or indentation rules (G5), blocks, declarations, naming. Produce a corpus of example programs that become the syntax tests.
