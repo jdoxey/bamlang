@@ -2,25 +2,17 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D8, compiler implementation (host language, backend, debug info, coverage on three OSes). After D8: `docs/PLAN.md`.
-- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]` inside list literals). Veto by opening an issue.
+- **Now:** writing `docs/PLAN.md` (milestones M0–M7), then D9 (modules, build, dependencies).
+- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes). Veto by opening an issue.
 - **Needs you:** nothing. Issue #3 answered (yes); your mitigations are in ADR-0002.
 
 ## Next action
 
-Roadmap item **D8** (ADR-0008, Full). Inputs passed on by earlier ADRs:
-- ADR-0001: pools with generations and segmented storage, deferred drop, owner cascades, run-time borrow flags, `Mutex`.
-- ADR-0003: crews on OS threads, cooperative cancellation, debug wait-for-cycle detection, release thread dump.
-- ADR-0004: traps unwind with drops; inline error traces.
-- ADR-0005: vtables, type descriptors (G8), and the link-time `dyn` call-graph check.
-- ADR-0006 and amendment 1: the M0 corpus comes from `docs/examples/syntax/p3n/`; M2 does the label checks.
-- ADR-0007: lower clauses by the desugaring; decide per-frame allocation.
-- G8 (debugger shows real values, DWARF/PDB on all three OSes), G9 (coverage), R9 (three OSes in CI).
-
-1. Step 1: research host languages (OCaml, Rust, Go, C, Zig, Swift) and backends (LLVM 19 is installed, C as a backend, QBE, Cranelift), with debug info and coverage per OS, and what went wrong for other compilers (Zig's LLVM split, Go's own backend, Odin and Jai on Windows, Swift's build times).
-2. Step 2: criteria first, then 6 sane and 4 crazy ideas, plus combinations.
-3. Step 3: for the top 3, build a tiny compiler front-to-back for one corpus program (`chatsim` subset or a smaller program), producing an executable on all three OSes in CI, with a debugger breakpoint showing a struct and a coverage report.
-4. Step 4: a Fable 5.2 reviewer (until 2026-11-16, then Opus) attacks the winner; scores by script; ADR. Then write `docs/PLAN.md`.
+1. Write `docs/PLAN.md` (ROADMAP says: after D8). Turn M0–M7 into concrete milestones with exit tests, using ADR-0008's pipeline: parse, resolve, check, lowered IR, C emitter, runtime. M0 is the conformance harness over `docs/examples/syntax/p3n/` (append-only). Each milestone ends with tests running in CI on all three OSes.
+2. Then D9 (ADR-0009, Full): modules, build and dependencies (G7). Inputs:
+   - ADR-0002: the generic dialect is allowed only in the stdlib and `extras`.
+   - ADR-0005: whole-program `dyn` link check.
+   - ADR-0008: clang is required. Decide whether to bundle clang and lld or require them per OS. FFI: traps never cross C frames, and extern declarations name every parameter (ADR-0006 amendment 1).
 
 ## Open questions carried forward
 
@@ -39,6 +31,8 @@ Roadmap item **D8** (ADR-0008, Full). Inputs passed on by earlier ADRs:
 Nothing.
 
 ## Log
+
+- 2026-11-14: D8 done (ADR-0008 Accepted after two loops; K3 Rust to C won once cdb ran on Windows).
 
 - 2026-11-14: issue #4 handled (ADR-0006 amendment 1); D7 done (ADR-0007 Accepted after two loops; C1 baseline tied, broken by the examples and G11).
 

@@ -11,6 +11,11 @@ S = {
     "K1 (review)": dict(debug=3.5, os3=4, agent=4, cov=3, trap=4, transp=3.5, effort=3, perf=5),
     "K2 (review)": dict(debug=3.5, os3=3, agent=4.5, cov=3, trap=3.5, transp=3.5, effort=3.5, perf=5),
     "K3 (review)": dict(debug=3, os3=4.5, agent=4, cov=3.5, trap=3.5, transp=5, effort=4, perf=4.5),
+    # loop 2, CI 43487717429 / 43488361625. K3: every program and debugger check passes on all three OSes (cdb shows
+    # Point and Shape). K1: real llvm-cov with branches, no C++ runtime, Linux/macOS pass; Windows debug info still
+    # wrong after two attempts (Win64 ABI); 1717 lines with its own ABI, debug metadata and covmap encoder.
+    "K1 loop 2": dict(debug=3, os3=4, agent=4, cov=4.5, trap=4.5, transp=3.5, effort=2.5, perf=5),
+    "K3 loop 2": dict(debug=4, os3=5, agent=4, cov=3.5, trap=4, transp=5, effort=4, perf=4.5),
 }
 def total(s, w=W): return sum(s[k] * w[k] / 5 for k in w)
 for n, s in sorted(S.items(), key=lambda x: -total(x[1])): print(f"{total(s):5.1f}  {n}")
