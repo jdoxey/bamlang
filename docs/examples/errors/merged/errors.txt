@@ -1,0 +1,170 @@
+// errors.txt: the D4 errors benchmark in the merged design (E1 spelling over E2 Result values).
+// ILLUSTRATIVE ONLY: not a syntax decision. D6 picks the final spellings.
+// Tags F1, F2, S1..S7, M1..M5 point at the decisions in docs/adr/0004-research/review-e1.md.
+//
+// Rules used here:
+//   fn f(x) -> T fails          is spelling for  fn f(x) -> Result of T            [S1]
+//   f(x)                        bare call: gives a Result that MUST be consumed (match, .is_ok(), report.add_if_err)
+//   x = try f(x)                propagates Err; only the outermost operation of a statement or binding   [S4]
+//   try f(x) context "..."      adds a context line; text evaluated only on the error path            [S3, M2]
+//   x = try f(x) or e { ... }   handler block yields a T or leaves the function; must use e, give a value, or be `or _ { }`  [S3, M1]
+//   return fail(kind, msg)      builds the Err of the enclosing function's Result
+//   Optional + `if v = o { } else { }` for absence; never an error kind    [S2]
+
+// ---- the one error type (stdlib, not written by the programmer) ----
+// Error { kind: ErrorKind, message, context: List of Text, trace: inline up to 8 sites, more: Int }   [S2, M3]
+// ErrorKind = parse | io | invalid | state | trap | test | ...   closed stdlib enum, about 12 values  [S2]
+
+// ================= part 1: config parser =================
+type Config = { entries: List of (section, key, value) }
+fn Config.get(self, section, key) -> Optional of Text       // absence is a value, not an error  [S2]
+
+fn parse_line(p: &mut Parser, no: Int, raw: Text) -> Unit fails
+    line = raw.trim()
+    if line.is_empty() or line.starts_with("#") { return }
+    if line.starts_with("[") and line.ends_with("]") { p.section = line.inner(); return }
+    if eq = line.find("=") {
+        key = line.before(eq).trim()
+        if key.is_empty() { return fail(parse, "config.ini:{no}: empty key") }
+        if p.cfg.get(p.section, key) is some { return fail(parse, "config.ini:{no}: duplicate key '{key}' in [{p.section}]") }
+        p.cfg.push(p.section, key, line.after(eq).trim())
+    } else {
+        return fail(parse, "config.ini:{no}: missing '='")
+    }
+
+fn parse_fail_fast(text: Text) -> Config fails
+    p = Parser.new()
+    for (i, l) in text.lines().enumerate() {
+        try parse_line(&mut p, i + 1, l)                            // [S4] statement-level try
+    }
+    return p.cfg
+
+fn parse_all(text: Text, report: &mut Report) -> Config           // cannot fail: collects instead
+    p = Parser.new()
+    for (i, l) in text.lines().enumerate() {
+        report.add_if_err(parse_line(&mut p, i + 1, l))             // [S1] consumes the Result
+    }
+    return p.cfg
+
+fn parse_int(s: Text) -> Int fails
+    n = s.to_int() else { return fail(parse, "not an integer: {s}") }   // Optional unwrapped with else
+
+fn part1() -> Unit fails
+    print("== part 1: config parser")
+    match parse_fail_fast(bad_text) {                               // [S1] bare call, consumed by match
+        Ok(_)  => {}
+        Err(e) => print("fail-fast: {e}")
+    }
+    report = Report.new()
+    _ = parse_all(bad_text, &mut report)
+    print("collect-all:")
+    for e in report.errors() { print("  {e}") }
+    print("{report.count()} errors")
+
+    cfg = try parse_fail_fast(good_text)
+    if s = cfg.get("server", "port") {                              // Optional, not an error
+        port = try parse_int(s) context "server.port"
+        print("server.port = {port}")
+    }
+    if s = cfg.get("server", "timeout") {
+        print("server.timeout = {s}")
+    } else {
+        print("timeout not set, using 30")
+    }
+
+// ================= part 2: replace_file with cleanup =================
+fn inject(fail_at: Int, step: Int) -> Unit fails
+    if fail_at == step { return fail(test, "injected failure") }
+
+// Lock: file-backed lock. Dropping it dirty (no close) still removes the file but is reported in
+// the debug exit report. close() consumes it and can fail.                          [S6, R4]
+fn Lock.create(path) -> Lock fails
+fn Lock.close(own self) -> Unit fails
+
+fn replace_file(dir, name, content, fail_at) -> Unit fails
+    lock_path = "{dir}/{name}.lock";  tmp = "{dir}/{name}.tmp";  dst = "{dir}/{name}"
+    txn = Txn.new(|| { remove(tmp); })                              // [S6] undo unless commit; cannot fail
+    lock = try Lock.create(lock_path) context "step 1: create lock"
+    txn.on_undo(|| lock.abandon())                                  // dirty drop is logged, file removed
+    try inject(fail_at, 1) context "step 1: create lock"
+
+    f = try File.create(tmp) context "step 2: write temp"
+    try f.write(content) context "step 2: write temp"
+    try f.close() context "step 2: write temp"                      // [S6] explicit fallible cleanup
+    try inject(fail_at, 2) context "step 2: write temp"
+
+    try inject(fail_at, 3) context "step 3: rename temp"
+    try rename(tmp, dst) context "step 3: rename temp"
+
+    try inject(fail_at, 4) context "step 4: remove lock"
+    try lock.close() context "step 4: remove lock"                  // [S6] consuming close
+    txn.commit()                                                    // success: undo does not run
+
+fn part2() -> Unit fails
+    print("== part 2: replace_file")
+    dir = try TempDir.create("errors") context "make temp dir"      // drop removes the tree; cannot fail
+    try write(dir / "data.txt", "old") context "seed data.txt"
+    print("start: content old")
+    labels = ["no failure", "fail at step 1", "fail at step 2", "fail at step 3", "fail at step 4"]
+    for run in 0..5 {
+        res = match replace_file(dir, "data.txt", "v{run + 1}", run) {   // [S1] consumed by match
+            Ok(_)  => "ok"
+            Err(e) => "error: {e}"
+        }
+        print("run {run + 1}, {labels[run]}: {res}")
+        files = try dir.list().sorted().join(" ") context "list dir"
+        content = try read(dir / "data.txt") context "read data.txt"
+        print("  files: {files}")
+        print("  content: {content}")
+    }
+
+// ================= part 3: crew with a failing worker and a trapping worker =================
+fn worker(n: Int, text: Text) -> Int fails
+    cfg = try parse_fail_fast(text) context "worker {n}"
+    return cfg.len()
+
+fn worker3(text: Text, m: &Mutex of Int, tally: &mut Int) -> Int fails
+    cfg = try parse_fail_fast(text) context "worker 3"
+    lock m {                                                        // guard released by unwinding; mutex poisoned  [S7]
+        tally += 10                                                 // half-done update ...
+        keys = cfg.keys()
+        print(keys[keys.len() + 5])                                 // ... then a trap: index out of range
+    }
+    return cfg.len()
+
+fn part3() -> Unit fails
+    print("== part 3: crew")
+    m = Mutex.new(0)
+    tally = 100
+    _ = try crew c {                                                // [F2] converts a CHILD's trap to Error{kind: trap} at the brace
+        c.go(fn() => worker(1, texts[0]))                           // [M5] c.go accepts failing functions
+        c.go(fn() => worker(2, texts[1]))
+        c.go(fn() => worker3(texts[2], &m, &mut tally))             // [F1] mutable borrow of tally by a child
+        c.go(fn() => worker(4, texts[3]))
+    } or e {
+        // first error = lowest worker number; others counted: "(plus N more)"
+        print("error: {e}")                                         // error: worker 2: config.ini:3: missing '=' (plus 1 more)
+        Unit
+    }                                                               // a trap in THIS body would NOT be converted  [F2]
+    // print(tally)
+    // ^ compile error: `tally` was mutably borrowed by a child of `try crew`; it is dead after the brace  [F1]
+    // (worker 3 trapped after `tally += 10`; the half-updated value must not be observable.)
+    print("mutex poisoned: {if m.is_poisoned() { "yes" } else { "no" }}")      // [S7]
+    // m.lock would trap here until a supervisor calls m.clear_poison()       // [S7]
+
+    expect_trap {                                                   // test-only block: passes iff the body traps
+        scratch = Mutex.new(0)
+        t = 0
+        worker3(texts[2], &scratch, &mut t)
+    }
+    print("expect_trap ok")
+
+// ================= main =================
+fn main() -> Unit fails
+    try part1()
+    try part2()
+    try part3()
+// main returning Err: runtime prints "fatal: {e}" with the trace and exits 1.
+// A trap outside any crew (or inside a callback from C, e.g. a qsort comparator) aborts with the trace  [S5]
+// A trap inside drop during unwinding is appended to the chain  [S5]
+// Forgetting to consume:  `inject(fail_at, 3)`  alone on a line  ->  compile error: unused Result of Unit fails  [S1]

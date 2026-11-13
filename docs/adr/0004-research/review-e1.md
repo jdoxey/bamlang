@@ -20,3 +20,21 @@
 | M1–M5 | minor | Empty handlers; eager context; trace allocation; Optional details; crew children | **Adopt.** The handler must use `e`, give a value, or be written `or _ { }`. Context is evaluated only on the error path. The trace is inline (about 8 PCs), with no allocation. `unwrap` is a long greppable name. No flattening and no narrowing of Optional. `-> Optional of T fails` is fine. `c.go` accepts failing functions. |
 
 The honest rule count is 16 (E2 alone is about 13).
+
+## Decisions on the gaps the loop-2 example found (`docs/examples/errors/merged/NOTES.md`)
+
+1. **F1 is a static rule on the error path only.** In a `try crew … or e { }` handler, and after it, every variable the
+   crew's children borrowed mutably counts as moved, so using it is a compile error. On the success path they are
+   live. A propagating `try crew` leaves the function, so nothing remains to use. No run-time flag is needed.
+2. **`crew` vs `try crew`.** A plain `crew` gives the children's `Result` (it must be consumed) and re-traps a
+   child's trap. `try crew` also converts child traps into an `Error` of kind `trap`. As a statement it propagates;
+   with `or e { }` it handles.
+3. **`Txn` covers only non-resource undo.** A resource owns its own cleanup: a `Lock`'s `drop` removes the file and
+   marks the drop as "dirty" in the debug report, and `try lock.close()` is the checked path. That avoids a borrow
+   conflict between the guard and the resource.
+4. **The crew adds `child N (site)` context** to every child error or trap. "First" means the lowest `c.go` order,
+   with traps included.
+5. **FFI callback thunks track depth** so that a trap in a callback from C aborts. This is a codegen rule for D8.
+6. **Must-consume applies to each `Result` expression.** A `List of Result` counts as consumed when the list is.
+7. **Atomic file replace** is a stdlib `replace` (`rename` on POSIX, `MoveFileEx` on Windows). This is for D10.
+8. **Unconsumed `Result`s in frames unwound by a trap are discarded,** because the trap is the louder event.
