@@ -75,3 +75,11 @@ and Austral is unverified.
 - **First:** Rust with arenas, pinned to LLVM 19.
 - **Runner-up:** OCaml, with the best ergonomics and the weakest Windows LLVM.
 - **Either way:** spike LLVM linking on all three OSes first.
+
+## CI finding (2026-11-14, run 43445277005)
+
+- `ocaml/setup-ocaml@v3` on `windows-2025` installs Cygwin and sets `BASH_ENV`, so every later `bash` step runs
+  under Cygwin (`uname` = `CYGWIN_NT`), which changed `sed` and broke the existing CRLF tests. `ocamlopt` was still not
+  on PATH for the step. Reverted. OCaml on Windows needs `opam exec` or a separate job, which counts against K2.
+- `windows-2025` has `clang`, `clang-cl`, `lld-link`, `llvm-cov`, `llvm-profdata`, `llvm-pdbutil`, `lldb` (LLVM in
+  `C:\Program Files\LLVM\bin`), MinGW `gdb`, and `rustc`. There is no `cdb`.

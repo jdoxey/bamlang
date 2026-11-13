@@ -31,11 +31,6 @@ jobs:
       - name: Install OCaml 5 (macOS)
         if: runner.os == 'macOS'
         run: brew install ocaml
-      - name: Install OCaml 5 (Windows)
-        if: runner.os == 'Windows'
-        uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: '5.3'
       - name: Install gdb and LLVM tools (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update -q && sudo apt-get install -y -q gdb llvm lld
