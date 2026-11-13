@@ -1,6 +1,6 @@
 # ADR-0005: Types, methods and interfaces
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Tier:** Full (see `docs/PROCESS.md`)
 - **Examples:** `docs/examples/types` (T3+ in `t3plus/`; rivals in `t1-records/`, `t2-modules/`, `t3-enum-ext/`)
@@ -68,8 +68,12 @@ marked `RUST-ONLY`.
 - **T2:** every call and every `close` needed the pool.
 - **T3:** the clearest to read, with the `Ext` arm as the only dynamic call. But plugins couldn't add container
   widgets, which fails G11 as a gate.
-- **T3+** (loop 2, `t3plus/`): see its `NOTES.md` for line counts, the stubs saved by provided functions, and the four
-  expected compile errors (take from a borrowed element, shadowing, F1 link error, private literal).
+- **T3+** (loop 2, `t3plus/`, Rust model plus pseudo-syntax):
+  - It prints the shared expected output, with 10 `RUST-ONLY` lines.
+  - The plugin container `Tabs` took 21 lines; T1 and T3 can't write it at all.
+  - Slider needed no stubs, because `focus_next` is provided.
+  - Dynamic calls are visible only in types. The `Ext` arm is the only one written in the core.
+  - The four expected compile errors are proposals, recorded for the M-phase conformance tests.
 
 ## Decision
 
@@ -102,7 +106,17 @@ marked `RUST-ONLY`.
 15. **Choosing between them** (this amends ADR-0002 rule 5): a closed set you own is an `enum`. A set others extend is
     an `iface` plus `dyn`. Both together is an `enum` with one `Ext(dyn I)` variant, named `Shape` / `ShapeKind`. A
     single callback is a closure field. Records of functions are no longer an extension pattern.
-16. **Orphans.** Only T's or I's module can declare `impl I for T`. Otherwise, write a wrapper type.
+16. **Clarifications from the T3+ example** (`docs/examples/types/t3plus/NOTES.md`):
+    - Enums as well as structs may declare `impl I for E`, and so use provided functions.
+    - A validated type keeps private fields. A DSL builds it through a constructor with named arguments and
+      defaults (D6), not a separate `pub` "spec" type.
+    - Built-in containers of your type (`Pool of Account`) get no user methods. Relational operations are functions in
+      the type's module: `Account.transfer(pool, a, b, m)`.
+    - Code isn't loaded dynamically in v1 (dependencies are linked from source, G7), so rule 9's whole-program check is
+      sound. It is re-run at every link, and false positives are accepted; the escape is `Mutex` or `Atomic` state.
+    - `s.intersects(s)` with `mut self` is an overlapping-argument error (ADR-0001 rule 4).
+    - An enum with an `Ext(dyn I)` variant can derive `show`, `equals` and `hash` only if `I` requires them.
+17. **Orphans.** Only T's or I's module can declare `impl I for T`. Otherwise, write a wrapper type.
 
 ### Scores (`0005-research/scores.py`, then the review's corrections)
 
@@ -154,7 +168,7 @@ could not.
 | Keywords | `iface`, `impl`, `dyn`, `pub`, `self`, `is` (receiver modes reuse `mut` and `take`) |
 | Grammar | method declarations inside type bodies; the interface body; field defaults |
 
-16 rules.
+17 rules.
 
 ## Adversarial review log
 
