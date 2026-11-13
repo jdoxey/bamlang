@@ -1,0 +1,37 @@
+type Target {
+    name String
+    sources List of String = []
+    deps List of String = []
+}
+
+type TargetBuilder {
+    target Target
+
+    mut fn source(path String) { target.sources.add(path) }
+    mut fn dependsOn(name String) { target.deps.add(name) }
+}
+
+type Project {
+    targets List of Target = []
+
+    mut fn target(name String, body fn with TargetBuilder) {
+        var builder = TargetBuilder(target: Target(name: name))
+        body(builder)
+        targets.add(builder.target)
+    }
+}
+
+fn main() {
+    var project = Project()
+    project.target("lib") {
+        source("lib/a.src")
+    }
+    project.target("app") {
+        source("app/main.src")
+        source("app/util.src")
+        dependsOn("lib")
+    }
+    for t in project.targets {
+        print("{t.name}: {t.sources.len()} sources, deps {t.deps}")
+    }
+}

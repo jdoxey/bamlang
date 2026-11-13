@@ -1,0 +1,4 @@
+PASS adds
+PASS strings
+FAIL broken (2 failed)
+2 passed, 1 failed

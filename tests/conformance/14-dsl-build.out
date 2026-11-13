@@ -1,0 +1,2 @@
+lib: 1 sources, deps []
+app: 2 sources, deps [lib]

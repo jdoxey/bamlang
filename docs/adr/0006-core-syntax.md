@@ -80,7 +80,7 @@ Writing the corpus found these gaps, each fixed in the Decision:
 16. Concurrency forms (ADR-0003): `spawn { }`, `scope { s -> s.spawn { } }`, `lock m { guard -> }`.
 17. Entry point: `fn main()`. The stdlib supplies `print` (adds a newline), `stdin.lines()`, and the container methods used in the corpus. Their exact set belongs to D10.
 
-**Reserved words (22):** `fn let var mut type enum interface match if else for in while loop break continue return and or not true false scope lock spawn of take`.
+**Reserved words (23, with `with` added by ADR-0007):** `fn with let var mut type enum interface match if else for in while loop break continue return and or not true false scope lock spawn of take`.
 
 ## Consequences
 

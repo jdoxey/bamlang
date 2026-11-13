@@ -1,0 +1,47 @@
+// A declarative tree built with receiver closures. `fn with Children` means the closure's body
+// sees the Children value passed to it as `self`, so `text(...)` means `self.text(...)`.
+type Node {
+    kind String
+    text String = ""
+    children List of Node = []
+}
+
+type Children {
+    items List of Node = []
+
+    mut fn text(content String) {
+        items.add(Node(kind: "text", text: content))
+    }
+
+    mut fn button(label String) {
+        items.add(Node(kind: "button", text: label))
+    }
+
+    mut fn column(content fn with Children) {
+        var inner = Children()
+        content(inner)
+        items.add(Node(kind: "column", children: inner.items))
+    }
+}
+
+fn render(node Node, depth Int) {
+    let pad = "  ".repeat(depth)
+    if node.kind == "column" {
+        print("{pad}column")
+    } else {
+        print("{pad}{node.kind}: {node.text}")
+    }
+    for child in node.children { render(child, depth + 1) }
+}
+
+fn main() {
+    var root = Children()
+    root.column {
+        text("Count")
+        button("+1")
+        column {
+            text("nested")
+        }
+    }
+    for node in root.items { render(node, 0) }
+}

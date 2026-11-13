@@ -1,0 +1,5 @@
+column
+  text: Count
+  button: +1
+  column
+    text: nested

@@ -1,0 +1,39 @@
+type Check {
+    failed Int = 0
+
+    mut fn expect(ok Bool) {
+        if not ok { failed = failed + 1 }
+    }
+}
+
+type Suite {
+    passed Int = 0
+    broken Int = 0
+
+    mut fn test(name String, body fn with Check) {
+        var check = Check()
+        body(check)
+        if check.failed == 0 {
+            passed = passed + 1
+            print("PASS {name}")
+        } else {
+            broken = broken + 1
+            print("FAIL {name} ({check.failed} failed)")
+        }
+    }
+}
+
+fn main() {
+    var suite = Suite()
+    suite.test("adds") { expect(1 + 1 == 2) }
+    suite.test("strings") {
+        expect("ab".len() == 2)
+        expect("ab".upper() == "AB")
+    }
+    suite.test("broken") {
+        expect(1 > 2)
+        expect(2 > 1)
+        expect(3 > 4)
+    }
+    print("{suite.passed} passed, {suite.broken} failed")
+}
