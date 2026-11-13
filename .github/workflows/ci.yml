@@ -23,6 +23,14 @@ jobs:
         with:
           go-version: '1.24'
           cache: false
+      - name: Install OCaml 5 (Linux)
+        if: runner.os == 'Linux'
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: '5.3'
+      - name: Install OCaml 5 (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ocaml
       - name: Run checks
         shell: bash
         run: bash ci/run.sh

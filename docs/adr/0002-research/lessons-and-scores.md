@@ -35,3 +35,17 @@ stands in for the built-in set (Optional, map, filter, group_by, min_by, max_by)
   recency core, not the whole cache.
 - **A leads by 20.** Under the reach-heavy variant (reach 40, simplicity 10) the totals are A 84.5, I 73.6; A still leads
   by more than the 5-point tie line.
+
+## Option I modelled again in OCaml 5.3 (`docs/examples/generics/i-ocaml/`, real inference, nothing written)
+
+- **Signatures** are inferred as `lru_put : int -> 'a list ref -> ('a, 'b) Hashtbl.t -> 'a -> 'b -> 'a option`.
+  They show shape but not what `'a` must support.
+- **The deliberate mistake** gives a better error than Go: `This expression has type "profile" but an expression was
+  expected of type "int list"`, at the user's argument.
+- **But capabilities are not inferred.** Using a closure as an LRU key compiles, then fails at run time with
+  `Invalid_argument("compare: functional value")`. Hindley-Milner alone gives no Eq/Hash checking, so option I
+  would need its own constraint inference on top. That is more compiler machinery (Impl stays 2), and a run-time hole
+  if it's missed.
+- **Record labels had to be unique** (`e_name`, `p_name`) for unannotated inference to work, a cost to Simplicity.
+
+Option I's scores are unchanged (the better error message offsets the capability hole).
