@@ -2,11 +2,14 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D10, standard library v1 scope (Light).
+- **Now:** your issue #5 (inheritance instead of protocols; no final classes; the 3 am test): amending ADR-0005. D10 waits.
 - **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes), 0009 dependencies (git paths, MVS, hashed, no build scripts). Veto by opening an issue.
 - **Needs you (optional yes/no):** may CI download a SHA-pinned llvm-mingw (182 MB) to test replacing the 6–7 GB Visual Studio Build Tools on Windows? I recommend yes. Until then the default is system clang (D9 records it as interim).
 
 ## Next action
+
+**Issue #5 first:** amendment 1 to ADR-0005 (`docs/adr/0005-research/inherit/`), Full tier. John's direction is fixed: implementation inheritance, no `final` (built-ins included), no protocols or extensions. Decide single or multiple inheritance, overriding rules, `dyn Base`, built-in subclassing, and what replaces `iface`/`impl`; score with the 3 am test. Then D10.
+
 
 **D10** (ADR-0010, Light: one pass, no subagents, ADR under 60 lines). Inputs that earlier ADRs passed on:
 - ADR-0002 owner answer: the container quality bar (benchmarks against C++ and Rust equivalents, docs, conformance tests); the `extras` repo.

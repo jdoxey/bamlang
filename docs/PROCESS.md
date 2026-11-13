@@ -51,6 +51,7 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
 - **Scores carry less than they seem to.** Weights invented by the model and one analyst per idea produce false precision. A 1-point gap is noise.
 - **Agreement between agents is weak evidence.** They are the same model with the same priors. Compiled code and counterexamples are stronger.
 - **Inventors overrate their own ideas** by about 15 points. Always use a separate analyst.
+- **The 3 am test (John, issue #5) is part of "simple" (G1, R6).** Someone half awake, reading code they have never seen (or a cheaper AI model doing grunt work), must quickly find where a called function is implemented and how it works. Every Simplicity, Readability or Transparency score states how a reader finds the implementation of a call, in steps.
 - **Define "simple" before scoring.** ADR-0001 counted rules to learn and missed hidden run-time work until John clarified (R6).
 - **Write real code early.** Forty prose ideas taught less than one concrete program would have.
 - **Check for an existing answer in the findings.** Both brainstorms kept pointing at pools and handles, and it was filed as a library detail.
@@ -68,6 +69,7 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
 
 ## Changelog
 
+- 2026-11-14: the 3 am test added to the meaning of simple (John, issue #5).
 - 2026-11-14: lesson from ADR-0009's retro (shared helpers).
 - 2026-11-14: lesson from ADR-0008's retro (real debugger sessions on every OS).
 - 2026-11-14: lesson from ADR-0007's retro (build the baseline; declare library signatures).
