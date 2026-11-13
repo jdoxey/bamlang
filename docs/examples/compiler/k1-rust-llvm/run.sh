@@ -43,7 +43,17 @@ if [ "$WIN" = 1 ]; then
   if command -v cdb >/dev/null; then
     ( cd "$SPEC" && cdb -c "bp \`spike.p3:$LINE\`; g; dx p; dv; q" "$B/spike$EXE" ) | tee "$B/debug.txt" | tail -25
   elif command -v llvm-pdbutil >/dev/null; then
-    llvm-pdbutil dump -types -l "$B/spike.pdb" | tee "$B/debug.txt" | grep -E "Point|spike.p3|\bx\b|\by\b" | head -20
+    # Windows: try a real lldb session on the PDB first; then check the PDB strictly.
+    if command -v lldb >/dev/null; then
+      ( cd "$SPEC" && lldb -b -o "breakpoint set -f spike.p3 -l $LINE" -o run -o "frame variable p" "$B/spike$EXE" ) > "$B/lldb-win.txt" 2>&1 || true
+      if grep -q 'x = 3' "$B/lldb-win.txt" && grep -q 'y = 4' "$B/lldb-win.txt"; then
+        echo "windows lldb shows p:"; grep -E 'x = 3|y = 4|stop reason|spike.p3:' "$B/lldb-win.txt" | head -8
+      else echo "windows lldb did not show p (first lines follow)"; head -12 "$B/lldb-win.txt"; fi
+    fi
+    llvm-pdbutil dump -types "$B/spike.pdb" > "$B/pdb-types.txt" 2>&1
+    grep -A3 'LF_STRUCTURE.*`Point`' "$B/pdb-types.txt" | head -8
+    grep -q 'LF_STRUCTURE.*`Point`' "$B/pdb-types.txt" || { echo "PDB lacks struct Point"; exit 1; }
+    grep -E 'LF_MEMBER \[name = `(x|y)`' "$B/pdb-types.txt" | head -4
   else echo "SKIP debug (cdb and llvm-pdbutil missing)"; fi
 elif [ "$OS" = Darwin ]; then
   if command -v lldb >/dev/null; then
