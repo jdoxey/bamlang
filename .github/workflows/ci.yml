@@ -31,6 +31,21 @@ jobs:
       - name: Install OCaml 5 (macOS)
         if: runner.os == 'macOS'
         run: brew install ocaml
+      - name: Install OCaml 5 (Windows)
+        if: runner.os == 'Windows'
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: '5.3'
+      - name: Install gdb and LLVM tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -y -q gdb llvm lld
+      - name: Show toolchain (compiler spikes, D8)
+        shell: bash
+        run: |
+          for t in clang clang-cl lld-link llvm-cov llvm-profdata llvm-pdbutil gdb lldb cdb ocamlopt rustc; do
+            printf '%-14s %s\n' "$t" "$(command -v $t || echo missing)"
+          done
+          ls "/c/Program Files/LLVM/bin" 2>/dev/null | head -40 || true
       - name: Run checks
         shell: bash
         run: bash ci/run.sh
