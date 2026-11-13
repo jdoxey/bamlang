@@ -1,6 +1,61 @@
+# D9 loop 2 notes: B1+ and B2+ (this section first; the loop-1 notes follow unchanged)
+
+`./run.sh` runs the loop-1 scenarios (B1, B2, B3 untouched; output in `results-loop1.md`) and then the loop-2 scenarios
+(`scenarios/run_scenarios2.py`, 22 scenarios x 2 tools, plus 39 TOML conformance cases; output in `results.md`).
+Local run: Linux only (Python 3.13, git 2.47, clang with llvm-nm). Windows and macOS are left to CI. Things written
+with them in mind: no OS symlinks (symlink, submodule and case-collision fixtures go straight into the git index),
+`nm` probed as `llvm-nm`, `nm --defined-only`, `nm -gU`, link `m` only under the gnu/darwin target tables, and a skip
+with a printed note when clang or nm is missing.
+
+## Size (non-blank, non-comment lines of Python)
+
+| Part | Lines |
+|---|---|
+| `common2.py` (shared: strict TOML ~230, git-object store and hashing ~270, C validation and build ~190, dialect gate, CLI) | 857 |
+| B1+ `b1plus/tool.py` | 324 |
+| B2+ `b2plus/tool.py` | 301 |
+| loop 1 for comparison: `common.py` 381, B1 96, B2 95, B3 191 | |
+| scenarios: `world2.py` 87, `run_scenarios2.py` 662, `toml_conformance.py` 70 | 819 |
+
+Per tool with shared code counted once: B1+ 1181, B2+ 1158 (B1 was 477, B2 476). The fixes cost about 2.4x: most of it is
+shared (hashing from git objects, validated C data, strict TOML), not specific to MVS or pins. B1+ and B2+ are within
+2% of each other, so size does not separate them.
+
+## What was hard
+
+- **Hashing without a checkout.** `git fetch` of one tag into a bare repo, `ls-tree -r -z`, `cat-file --batch`; the
+  cache and vendor then hold exactly the hashed set, so "files outside the set" is checkable by a plain directory walk.
+  The `text=auto` fixture needed a real CRLF checkout to prove it is not vacuous (the scenario asserts the checkout differs
+  from the blob). `GIT_CONFIG_COUNT` carries `core.autocrlf=true` and `core.eol=crlf` into the tool; the tool no longer
+  forces `core.autocrlf=false`, because it never checks anything out.
+- **Chained trust makes B1+ publish in dependency order,** like B2: a package's `deps.sum` needs its dependencies'
+  hashes, so a dependency cannot be re-tagged without re-tagging dependents (that is the point). A package that has
+  requirements but no `deps.sum` is refused.
+- **Full build list in the root (B1+).** `build` needs only the listed versions, so superseded versions are no longer
+  fetched or vendored; `tidy` (and so `add`/`update`) still reads superseded versions' requirements to compute the list,
+  and checks them against the requirer's `deps.sum` without recording them.
+- **TOML.** A character-level parser with line numbers was simpler than the old line-based one, and it is what made
+  multi-line arrays, literal strings and the duplicate-table rule cheap. The writer escapes control characters.
+- **C.** Per-ABI tables, validation, `-I`/`-D`/`-l` assembly and symbol checking are ~190 lines. COFF objects carry
+  absolute symbols (`@feat.00`, `_fltused`) that look exported to `nm`; they are skipped by name.
+- **Replace plus chained trust.** A replaced path cannot be checked against its requirers' recorded hashes (the fork's
+  files differ on purpose), so the root records the fork's own hash (`deps.sum` in B1+, the root pin in B2+).
+
+## Where this contradicts or refines the review
+
+- **No silent downgrade, but also no downgrade.** With the whole list in the root manifest, a listed `C v1.4.0` acts as a
+  requirement, so in S4 it stays (C v1.4.0 and C/v2 coexist). The review's fix assumed a downgrade would be printed; here
+  it cannot happen without an explicit `add path <older>` (printed as `downgrade`, scenario N8).
+- **The age rule stays defeatable.** A forged date on an ordinary descendant commit is accepted (N4b); the descent check
+  stops only rewritten history. The tool prints that the age rule is a convenience.
+- **B2+ `update` is atomic.** S4 now fails at `update B` and writes nothing (loop 1 failed at `build`).
+- **B2+ still cannot build S4,** by design; B1+ can for pure modules and refuses it for a C wrapper (N11).
+- **Commands typed:** S2 4 (B1+) against 6 (B2+); S3 6 against 8. Error recovery for B2+ is one command because the
+  message prints the exact `tidy --yes` to type.
+
 # D9 step 3 notes: three dependency-manager spikes
 
-Run `./run.sh` (bash, python3 >= 3.9, git). Output is in `results.md`. Windows and macOS were not run locally; the
+Run `./run.sh` (bash, python3 >= 3.9, git). Output is in `results-loop1.md`. Windows and macOS were not run locally; the
 code uses `Path.as_uri()` (gives `file:///C:/...`), `core.autocrlf=false`, LF-only writes and a chmod-retry `rmtree`
 for the read-only git objects Windows keeps.
 
