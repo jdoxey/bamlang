@@ -1,0 +1,18 @@
+A: sum=163183 first=[1, 4, 9] last=[999996000004, 999998000001, 1000000000000]
+B: total=2870 counter=20
+C: event start
+C: progress 1
+C: event tick
+C: progress 2
+C: event tick
+C: progress 3
+C: event tick
+C: progress 4
+C: event cancel
+C: cancelled at step 4, partial = [1, 2, 3, 4]
+C: event tick
+C: idle, no job
+C: event tick
+C: idle, no job
+C: event quit
+C: joined
