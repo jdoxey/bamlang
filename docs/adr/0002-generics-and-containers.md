@@ -4,7 +4,7 @@
 - **Date:** 2026-11-13
 - **Tier:** Full (see `docs/PROCESS.md`)
 - **Examples:** `docs/examples/generics` (A+ in `aplus/`; rivals in `a-closed-set/`, `c-interfaces/`, `i-inferred/`, `i-ocaml/`)
-- **Decided by:** Claude (ruling R7). John may veto by opening an issue. **Depends on issue #3** (G3 reading).
+- **Decided by:** Claude (ruling R7). John may veto by opening an issue. Issue #3 (the G3 reading) was answered **yes** by John on 2026-11-13; see "Owner's answer on G3" at the end.
 
 ## Context
 
@@ -18,7 +18,7 @@ anyway. The pain shows up in user-written reusable code and in untyped escape ha
 
 | Goal / problem | Effect | Why |
 |---|---|---|
-| G3 | serves, **if issue #3 is yes** | Users and libraries never declare type parameters, templates or generic functions. A fixed set of built-in types takes an element type, like Go's `[]T` before 2022. If #3 is no, this ADR and ADR-0001 reopen. |
+| G3 | serves (issue #3: yes) | Users and libraries never declare type parameters, templates or generic functions. A fixed set of built-in types takes an element type, like Go's `[]T` before 2022. |
 | G1 (R6) | serves | No type-level language to read; every cost is visible. The rules added are listed below. |
 | G6 | serves | A frozen v1 set of 17 container and concurrency shapes. |
 | G7 | strains | Third-party libraries can't ship their own typed containers. They write element-free logic over `Id`, or sum types. |
@@ -199,3 +199,18 @@ Rules to remember: ADR-0001's 6, plus 8 here.
 | `0002-research/review-a.md` (option A) | F1 G3 reading; F2 example in a GC language; F3 raw slot ids; F4 ceiling; F5 closure capture; F6 copies; F7 the closed set; F8 derived ordering; F9 benchmark; F10 per-field exclusivity; F11 hidden costs | F1 asked as issue #3; all others adopted as A+ (`a-plus.md`) |
 | A+ example notes | `take`, Ids/Table window, block borrows, literals, closure state | Decided in `a-plus.md` |
 | `0002-research/review-aplus.md` (A+) | S1–S7, M1–M4; review-a's arithmetic wrong | All adopted; scores corrected; recorded as a tie broken by examples and reversibility |
+
+## Owner's answer on G3 (issue #3, 2026-11-13)
+
+John answered yes: "built-in types should be able to have element types… The problem isn't having generics/templated
+types, it's more about making sure they're not overused." He named the cost (third parties can't add List, Map or Set
+variants) and two mitigations. Decisions taken on them:
+
+1. **The built-in containers must be great.** D10 sets a quality bar for each shape: a benchmark against the C++ and
+   Rust standard equivalents, complete docs, and conformance tests.
+2. **A way to contribute implementations:**
+   - **(b) Contributing to the core is the main path.** A documented proposal template applies the "add a shape" rule
+     above (two real programs need it; decomposition costs more than 20 glue lines per use).
+   - **(a) One official `extras` repository** is written in the stdlib's internal generic dialect (for example
+     `SmallList`, `BTreeMap`, `RingBuffer`, `Trie`). Applications import its shapes like built-ins but can't declare
+     type parameters themselves. The build tool (D9) allows the dialect only in the stdlib and in `extras`.

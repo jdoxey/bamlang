@@ -4,7 +4,7 @@
 
 - **Now:** D4, errors and absence (exceptions, results or error values; can anything be null).
 - **Decided:** ADR-0001 memory (owned values, moves, checked handles into pools), ADR-0002 containers (a built-in set like `List of Employee`; no user type parameters), ADR-0003 concurrency (scoped `crew` threads, owned channels, no async). Veto by opening an issue.
-- **Needs you:** issue #3, a yes/no on whether G3 allows built-in `List of T`-style types. I'm carrying on assuming yes.
+- **Needs you:** nothing. Issue #3 answered (yes); your mitigations are in ADR-0002.
 
 ## Next action
 
@@ -21,7 +21,7 @@ Roadmap item **D4** (ADR-0004, Full). Inputs:
 
 ## Open questions carried forward
 
-- **Issue #3 (G3 reading):** ADR-0001 and ADR-0002 assume yes.
+- **Issue #3 (G3 reading):** answered yes by John. D9 must restrict the generic dialect to the stdlib and `extras`; D10 must set the container quality bar.
 - **Q15, is G11 syntax only:** decide in D7. Until then, assume syntax only for v1.
 - From ADR-0001: D3 must define channels, `Mutex of T` and the main-thread rule; D4 optional handles and traps; D5 methods on pool entries.
 
