@@ -5,6 +5,10 @@ S = {
     "E1 fails+try, one Error":   [5, 5, 4, 3, 4, 4, 4, 5],
     "E2 Result+check, one Error": [4, 5, 4, 2, 4, 5, 5, 5],
     "E3 typed enums + ?":        [4, 4, 2, 4, 3, 3, 4, 5],
+    # After review-e1.md (corrected cells), plus the merged design from loop 2:
+    "E1+ fixed (review)":        [5, 5, 3.5, 3, 4, 4, 3, 5],
+    "E2 fixed (review)":         [5, 5, 4, 2.5, 4, 4.5, 4, 5],
+    "M merged (E1 spelling over E2 values)": [5, 5, 3.5, 3.5, 4, 4.5, 3, 5],
 }
 def t(s, w): return sum(w[c] * x for c, x in zip(C, s)) * 20 / sum(w.values())
 for o, s in S.items(): print(f"{o}: {t(s, W):.1f}")

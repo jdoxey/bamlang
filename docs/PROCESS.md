@@ -56,11 +56,13 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
 - **Run a second, differently shaped example before the review closes.** In ADR-0001 the widgets program found eight rule gaps that the reviewer missed, because chatsim had no hierarchies and used global pools.
 - **Recompute every score with the script, including the reviewer's.** In ADR-0002 a reviewer's hand arithmetic turned a tie into a 7-point win. Also, rerun the example after each decision that changes a rule, because the A+ example went stale within one step.
 - **Ask the reviewer to check claims the example only emulates.** In ADR-0003 the "Live crew" passed review on paper; the example had quietly emulated it with something else.
+- **Model each finalist's design, not its host language.** In ADR-0004, E2 was scored on Go's missing must-use check rather than on its own rule, which nearly decided the result.
 - **A GUI example is too big.** Use a small scripted simulation that has the same lifetimes (see `docs/examples/chatsim/SPEC.md`).
 
 ## Changelog
 
 - 2026-11-13: lesson from ADR-0001's retro (second example).
+- 2026-11-13: lesson from ADR-0004's retro (model the design, not the host).
 - 2026-11-13: lesson from ADR-0003's retro (emulated claims).
 - 2026-11-13: lesson from ADR-0002's retro (recompute scores; rerun examples after rule changes).
 

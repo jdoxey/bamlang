@@ -2,21 +2,22 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D4, errors and absence (exceptions, results or error values; can anything be null).
-- **Decided:** ADR-0001 memory (owned values, moves, checked handles into pools), ADR-0002 containers (a built-in set like `List of Employee`; no user type parameters), ADR-0003 concurrency (scoped `crew` threads, owned channels, no async). Veto by opening an issue.
+- **Now:** D5, types and OO (methods with implicit `self`, interfaces, inheritance).
+- **Decided:** ADR-0001 memory (owned values, moves, checked handles into pools), ADR-0002 containers (built-in `List of T` etc.; no user type parameters), ADR-0003 concurrency (scoped `crew` threads, no async), ADR-0004 errors (`fails`/`try` over `Result`, one `Error`, no null). Veto by opening an issue.
 - **Needs you:** nothing. Issue #3 answered (yes); your mitigations are in ADR-0002.
 
 ## Next action
 
-Roadmap item **D4** (ADR-0004, Full). Inputs:
-- ADR-0001 has traps (stale `pool[h]`, exclusivity, wrong pool) and `if x = … else`.
-- ADR-0002 put `Optional` and `Result` in the built-in set, with sum types and exhaustive `match`.
-- ADR-0003: crews re-raise the first child error ("plus N more"); a cancelled call returns its closed result.
-- Decide: errors as values vs exceptions vs both; whether traps can be caught; error propagation syntax (G4); what `none` is; how errors cross a crew; the error type (closed set? user enums?).
+Roadmap item **D5** (ADR-0005, Full). Inputs:
+- Charter P-PY ("passing self makes OO weird") and P-C ("no native OO support").
+- ADR-0001: owned values, pools and handles; methods on pool entries (implicit `self` is the borrowed entry); `take self`.
+- ADR-0002: user sum types with `match`, records of functions as the extension pattern, no user type parameters, derived `equals`/`hash`.
+- ADR-0004: `fails` methods.
+- Decide: methods and implicit `self`; interfaces (structural? nominal? dispatch cost and transparency); inheritance or not; constructors and visibility; enums and structs.
 
-1. Step 1: research (Go, Rust, Swift, Zig, Java/Kotlin, C++ expected/exceptions, Odin, Midori/Joe Duffy's error model), with what went wrong.
+1. Step 1: research (Go interfaces, Rust traits, Swift protocols, Java/Kotlin classes, Odin/Zig no-OO, Python self, C++ virtual, Objective-C), with what went wrong.
 2. Step 2: criteria first, then 6 sane and 4 crazy ideas, plus combinations.
-3. Step 3: write the top 3 as real code. Use chatsim's error paths, or a new `errors` benchmark (a parser plus file I/O plus a crew), with `run.sh` on all three OSes.
+3. Step 3: write the top 3 as real code on a shapes/plugins/UI-widget benchmark, with `run.sh` on all three OSes. Model each design, not its host language (PROCESS lesson).
 4. Step 4: an Opus reviewer attacks the winner; scores by script; decide; ADR under 300 lines.
 
 ## Open questions carried forward
@@ -39,6 +40,7 @@ Nothing.
 
 - 2026-11-13: repo set up from the planning conversation.
 - 2026-11-13: first run on Sonnet skipped the real-examples step. John reset `main`; that work is on the `sonnet-attempt` branch for reference only.
+- 2026-11-13: ADR-0004 Accepted (merged E1 spelling over E2 values after one review loop). Issue #3 answered yes by John and closed.
 - 2026-11-13: ADR-0003 Accepted (a tie broken by the examples and reversibility after one review loop).
 - 2026-11-13: ADR-0002 Accepted after two review loops (a tie broken by the examples and reversibility). OCaml added to CI on Linux and macOS.
 - 2026-11-13: chatsim in C, Swift (O1), Rust (O4) and C (O9); widgets under O9-S. Opus review found a fatal hole in O9, fixed as O9-S. ADR-0001 Accepted. Issues #1 and #2 handled and closed.
