@@ -19,7 +19,7 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
    - Generate options from different angles: at least 6 sane and 4 crazy. Give each inventor a different starting lens.
    - Also consider **combinations** of options. The best candidate in ADR-0001 was a combination nobody had listed.
 3. **Real examples.**
-   - Write real, compiled, run code for the top 3 options. If our language can't run it yet, model each option in the closest existing language (for example Swift for ARC, Rust for moves, Zig or C for manual and handles).
+   - Write real, compiled, run code for the top 3 options. If our language can't run it yet, model each option in the closest existing language (for example C++ `shared_ptr` for ARC, Rust for moves, C for manual memory and handles).
    - Use the shared benchmark program in `docs/examples/` where it fits, so decisions can be compared.
    - Record what the code taught: line counts, bugs hit, what was awkward, what was hidden.
 4. **Review and decide.**
@@ -30,7 +30,16 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
 5. **Retro.**
    - Add one line to "Lessons" below if the process could have been cheaper or caught something sooner.
 
+## Which model does what
+
+- **Opus (the main session):** criteria, choosing between options, reviews, writing ADRs, and any compiler code where a bug would be silent.
+- **Sonnet (subagents, `model: sonnet`):** research and note-taking, generating option write-ups, writing example programs to a spec you give, test scripts, CI fixes and other mechanical edits.
+- **Reviewer subagents use Opus.** A weaker reviewer misses the counterexamples.
+- When unsure, ask whether a mistake would be caught by a compiler or test. If yes, Sonnet. If no, Opus.
+
 ## Budget rules (Pro plan)
+
+- A hook caps usage at 85% of the 5-hour and weekly allowances. Usage is only measured between main-session replies, so a burst of subagents can overshoot. Keep bursts small.
 
 - At most **5 subagents per step**, run in one batch. Two 20-agent rounds each used a whole 5-hour window.
 - Subagents return their text to the coordinator, and the coordinator saves it. Subagents sometimes can't write files.
@@ -49,3 +58,5 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
 ## Changelog
 
 - 2026-11-13: first version, written from the ADR-0001 work.
+- 2026-11-13: added the 85% usage cap and the Debian and three-OS CI notes.
+- 2026-11-13: first autonomous run (Sonnet) reached ADR 6 in two hours with no example code. Added the model split, the no-skipping rule and a CI check that blocks Accepted Full-tier ADRs without runnable examples.

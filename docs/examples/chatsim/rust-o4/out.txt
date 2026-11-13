@@ -1,0 +1,59 @@
+> join alice general
+  alice joined general (1 members)
+> join bob general
+  bob joined general (2 members)
+> join echobot general
+  echobot joined general (3 members)
+> say alice "hello"
+  [general] bob <- alice: hello
+  [general] alice <- echobot: echo: hello
+  [general] bob <- echobot: echo: hello
+> remind alice 3 "stand up"
+  reminder set
+> remind bob 9 "later"
+  reminder set
+> dm bob alice "hi"
+  [general] alice <- bob: hi
+> move bob random
+  bob joined random (1 members)
+> say bob "anyone here?"
+> leave alice
+  alice left
+> tick 3
+  reminder dropped (user gone)
+  now=3
+> dm bob alice "are you there"
+  dm failed: alice is not here
+> say bob "a"
+> say bob "b"
+> say bob "c"
+> say bob "d"
+  rate limited
+> tick 1
+  now=4
+> leave bob
+  room random closed, 4 messages queued for archive
+  bob left
+> leave echobot
+  room general closed, 2 messages queued for archive
+  echobot left
+> join carol general
+  carol joined general (1 members)
+> say carol "back again"
+> stats
+  users=1 rooms=1 timers=1 archived_rooms=0 archived_msgs=0 pending=2
+> flush
+  archived random: 4 msgs, 15 bytes
+  archived general: 2 msgs, 16 bytes
+> stats
+  users=1 rooms=1 timers=1 archived_rooms=2 archived_msgs=6 pending=0
+> leave carol
+  room general closed, 1 messages queued for archive
+  carol left
+> tick 10
+  reminder dropped (user gone)
+  now=14
+> flush
+  archived general: 1 msgs, 10 bytes
+> stats
+  users=0 rooms=0 timers=0 archived_rooms=3 archived_msgs=7 pending=0

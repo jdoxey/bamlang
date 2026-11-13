@@ -21,7 +21,7 @@ Work top to bottom. Tick an item when its ADR is Accepted or its milestone passe
 
 After D8, write `docs/PLAN.md` with the detailed milestones. The outline:
 
-- [ ] **M0** CI on macOS, Windows and Linux. A conformance test harness that runs the D6 corpus. Conformance tests are append-only: never weaken one to make it pass.
+- [ ] **M0** A conformance test harness, wired into the existing three-OS CI (`ci/run.sh`), which runs the D6 corpus. Conformance tests are append-only: never weaken one to make it pass.
 - [ ] **M1** Lexer and parser for the whole D6 corpus.
 - [ ] **M2** Type checker.
 - [ ] **M3** Code generation: "hello world" runs on all three OSes.

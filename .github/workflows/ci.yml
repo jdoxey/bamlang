@@ -1,0 +1,24 @@
+# Runs ci/run.sh on Linux, Windows and macOS for every push to main.
+# Claude extends ci/run.sh as the project grows. Keep all three OSes.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-26]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run checks
+        shell: bash
+        run: bash ci/run.sh

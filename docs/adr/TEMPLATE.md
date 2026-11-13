@@ -3,6 +3,7 @@
 - **Status:** Proposed | Accepted | Superseded by ADR-XXXX
 - **Date:** YYYY-MM-DD
 - **Tier:** Light | Full (see `docs/PROCESS.md`)
+- **Examples:** `docs/examples/<folder>` (Full tier: required before Status can be Accepted; CI checks it)
 - **Decided by:** Claude (ruling R7). John may veto by opening an issue.
 
 ## Context
