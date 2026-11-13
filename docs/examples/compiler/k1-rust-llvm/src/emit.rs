@@ -9,7 +9,7 @@ pub struct Opts { pub win: bool, pub macho: bool, pub file: String, pub dir: Str
 
 fn ty(t: &LTy) -> String {
     match t { LTy::I64 => "i64".into(), LTy::I1 => "i1".into(), LTy::Ptr => "ptr".into(), LTy::Void => "void".into(),
-        LTy::Token => "token".into(), LTy::Named(n) => n.clone() }
+        LTy::Named(n) => n.clone() }
 }
 fn opty(o: &Op) -> LTy {
     match o { Op::Reg(_, t) | Op::Undef(t) => t.clone(), Op::Int(_) => LTy::I64, Op::Global(_) => LTy::Ptr }
@@ -144,7 +144,7 @@ pub fn emit(m: &Module, o: &Opts) -> String {
             let arg = v.arg.map(|a| format!("arg: {}, ", a)).unwrap_or_default();
             md.add(format!("!DILocalVariable(name: \"{}\", {}scope: !{}, file: !{}, line: {}, type: {})", v.name, arg, sp, file, v.line, tref(&v.ty)))
         }).collect();
-        let mut loc = |md: &mut Md, line: u32| -> String {
+        let loc = |md: &mut Md, line: u32| -> String {
             if line == 0 { return String::new(); }
             let id = match md.locs.get(&(sp, line)) { Some(i) => *i, None => { let i = md.add(format!("!DILocation(line: {}, scope: !{})", line, sp)); md.locs.insert((sp, line), i); i } };
             format!(", !dbg !{}", id)

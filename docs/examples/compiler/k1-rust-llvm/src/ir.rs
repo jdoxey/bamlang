@@ -3,7 +3,7 @@ use crate::ast::{Span, Type};
 use crate::check::{EnumInfo, StructInfo};
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum LTy { I64, I1, Ptr, Void, Token, Named(String) }
+pub enum LTy { I64, I1, Ptr, Void, Named(String) }
 
 #[derive(Clone, Debug)]
 pub enum Op { Reg(usize, LTy), Int(i64), Global(String), Undef(LTy) }

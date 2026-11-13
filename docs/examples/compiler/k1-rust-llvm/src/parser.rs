@@ -288,7 +288,7 @@ impl Parser {
                 self.expect_sym("(")?;
                 self.expect_sym(")")?;
                 let (body, span) = self.block()?;
-                Ok(Self::mk(ExprKind::Lambda(Box::new(Lambda { body, line, end_line: span.l2, span })), line))
+                Ok(Self::mk(ExprKind::Lambda(Box::new(Lambda { body, line, span })), line))
             }
             Tok::Ident(s) if s == "match" => {
                 self.next();

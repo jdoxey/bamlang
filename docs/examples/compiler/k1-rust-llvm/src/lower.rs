@@ -23,7 +23,6 @@ struct Cx {
     nlabel: usize,
     eh: bool,
     funclet: Option<usize>,
-    ret: Type,
     ncounters: u32,
     is_last: bool,
     regions: Vec<Region>,
@@ -43,8 +42,8 @@ struct L<'a> {
     cx: Cx,
 }
 
-fn new_cx(ret: &Type) -> Cx {
-    Cx { regs: 0, blocks: vec![], cur: 0, scopes: vec![], allocas: vec![], dbgvars: vec![], lp: HashMap::new(), nlabel: 0, eh: false, funclet: None, ret: ret.clone(), ncounters: 0, is_last: false, regions: vec![], blk_end: vec![] }
+fn new_cx(_ret: &Type) -> Cx {
+    Cx { regs: 0, blocks: vec![], cur: 0, scopes: vec![], allocas: vec![], dbgvars: vec![], lp: HashMap::new(), nlabel: 0, eh: false, funclet: None, ncounters: 0, is_last: false, regions: vec![], blk_end: vec![] }
 }
 
 pub fn lty(t: &Type) -> LTy {
@@ -188,9 +187,14 @@ impl<'a> L<'a> {
             fparams.push((r, LTy::Ptr));
             self.cx.scopes[0].vars.insert("self".into(), Var { ptr: Op::Reg(r, LTy::Ptr), ty: Type::Struct(s.into()) });
         }
-        let regs: Vec<usize> = params.iter().map(|(_, t)| { let r = self.reg(); fparams.push((r, lty(t))); r }).collect();
+        // Aggregates (structs, enums) are passed as a pointer to the caller's copy on every target: LLVM IR by-value
+        // aggregates do not follow the C ABI (Win64 passes >8 bytes by reference), and the callee must own the
+        // storage that dbg.declare describes. The callee copies into its own alloca.
+        let agg = |t: &Type| matches!(t, Type::Struct(_));
+        let regs: Vec<usize> = params.iter().map(|(_, t)| { let r = self.reg(); fparams.push((r, if agg(t) { LTy::Ptr } else { lty(t) })); r }).collect();
         for (i, ((n, t), r)) in params.iter().zip(regs).enumerate() {
-            self.declare(n, t, line, Some(i + 1), Op::Reg(r, lty(t)));
+            let init = if agg(t) { self.load(t, Op::Reg(r, LTy::Ptr), line) } else { Op::Reg(r, lty(t)) };
+            self.declare(n, t, line, Some(i + 1), init);
         }
         let c0 = self.counter();
         self.prof(c0, line);
@@ -451,7 +455,18 @@ impl<'a> L<'a> {
                         None
                     }
                     _ => {
-                        let vals: Vec<Op> = args.iter().map(|a| self.expr(&a.value).unwrap()).collect();
+                        let mut vals: Vec<Op> = args.iter().map(|a| self.expr(&a.value).unwrap()).collect();
+                        if !self.info.structs.iter().any(|s| &s.name == name) {
+                            // by-reference aggregate arguments: spill to a temporary, pass its address
+                            for (v, a) in vals.iter_mut().zip(args) {
+                                if matches!(a.value.ty, Type::Struct(_)) {
+                                    let t = self.reg();
+                                    self.cx.allocas.push(Inst::Alloca { dst: t, ty: lty(&a.value.ty) });
+                                    self.emit(Inst::Store { val: v.clone(), ptr: Op::Reg(t, LTy::Ptr) }, line);
+                                    *v = Op::Reg(t, LTy::Ptr);
+                                }
+                            }
+                        }
                         if let Some(si) = self.info.structs.iter().find(|s| &s.name == name) {
                             let lt = LTy::Named(format!("%{}", si.name));
                             let mut agg = Op::Undef(lt.clone());

@@ -1,0 +1,15 @@
+[package]
+name = "p3c"
+version = "0.2.0"
+edition = "2021"
+description = "K1 spike: p3 compiler emitting textual LLVM IR (no dependencies)"
+publish = false
+
+[[bin]]
+name = "p3c"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+opt-level = 2

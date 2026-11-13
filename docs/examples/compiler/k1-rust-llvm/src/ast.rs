@@ -41,7 +41,7 @@ pub enum IPart { Lit(String), Expr(Expr) }
 pub struct Arg { pub label: String, pub value: Expr, pub pun: bool }
 
 #[derive(Debug)]
-pub struct Lambda { pub body: Vec<Stmt>, pub line: u32, pub end_line: u32, pub span: Span }
+pub struct Lambda { pub body: Vec<Stmt>, pub line: u32, pub span: Span }
 
 // `end` is the end position (line, col exclusive) of the statement's last token.
 #[derive(Debug)]
