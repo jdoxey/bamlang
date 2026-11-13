@@ -1,0 +1,28 @@
+join alice general
+join bob general
+join echobot general
+say alice "hello"
+remind alice 3 "stand up"
+remind bob 9 "later"
+dm bob alice "hi"
+move bob random
+say bob "anyone here?"
+leave alice
+tick 3
+dm bob alice "are you there"
+say bob "a"
+say bob "b"
+say bob "c"
+say bob "d"
+tick 1
+leave bob
+leave echobot
+join carol general
+say carol "back again"
+stats
+flush
+stats
+leave carol
+tick 10
+flush
+stats
