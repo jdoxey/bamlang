@@ -104,7 +104,7 @@ type Server {
     var i = 0
     while i < self.rooms[room].members.len() {   # index, not iterator: a callback may post again
       let m = self.rooms[room].members[i]
-      if m.user != from { m.cb(srv: self, room: room, from: from, text: text) }
+      if m.user != from { m.cb(srv: self, room, from, text) }
       i += 1
     }
   }
@@ -120,7 +120,7 @@ type Server {
       fn(srv, room, from, text) {
         print(text: "  {srv.users[u].name} sees {srv.users[from].name}: {text}")
         if not srv.users[from].is_bot {
-          srv.post(room: room, from: u, text: "echo: {text}")
+          srv.post(room, from: u, text: "echo: {text}")
         }
       }
     } else {
@@ -128,14 +128,14 @@ type Server {
         print(text: "  {srv.users[u].name} sees {srv.users[from].name}: {text}")
       }
     }
-    self.rooms[r].members.push(item: Member(user: u, cb: cb))
+    self.rooms[r].members.push(item: Member(user: u, cb))
     self.users[u].room = some(value: r)
     print(text: "{self.users[u].name} joined #{self.rooms[r].name}")
   }
 
   fn exit_room(mut self, u: Handle of User) {
     if r = self.users[u].room {
-      self.rooms[r].remove_member(u: u)
+      self.rooms[r].remove_member(u)
       self.users[u].room = none
       print(text: "{self.users[u].name} left #{self.rooms[r].name}")
       if self.rooms[r].members.is_empty() {
@@ -158,18 +158,18 @@ type Server {
   }
 
   fn cmd_join(mut self, name: Str, room: Str) {
-    if self.find_user(name: name) != none {
+    if self.find_user(name) != none {
       print(text: "join failed: {name} is already here")
       return
     }
     let u = self.users.add(value: User(name: name.copy(), room: none, last_from: none, is_bot: name == "echobot"))
-    self.enter_room(u: u, room_name: room)
+    self.enter_room(u, room_name: room)
   }
 
   fn cmd_say(mut self, name: Str, text: Str) {
-    if u = self.find_user(name: name) {
-      if not self.rate_ok(name: name) { return }
-      if r = self.users[u].room { self.post(room: r, from: u, text: text) }
+    if u = self.find_user(name) {
+      if not self.rate_ok(name) { return }
+      if r = self.users[u].room { self.post(room: r, from: u, text) }
     } else {
       print(text: "say failed: {name} is not here")
     }
@@ -190,17 +190,17 @@ type Server {
       (none, _) => print(text: "dm failed: {from_name} is not here")
       (_, none) => print(text: "dm failed: {to_name} is not here")
       (some(f), some(d)) => {
-        if self.rate_ok(name: from_name) { self.deliver_dm(from: f, dest: d, text: text) }
+        if self.rate_ok(name: from_name) { self.deliver_dm(from: f, dest: d, text) }
       }
     }
   }
 
   fn cmd_remind(mut self, name: Str, delay: Int, text: Str) {
-    if u = self.find_user(name: name) {
+    if u = self.find_user(name) {
       let due = self.clock + delay
       var i = 0
       while i < self.timers.len() and self.timers[i].due <= due { i += 1 }
-      self.timers.insert(at: i, value: Timer(due: due, user: some(value: u), user_name: name.copy(), text: text.copy()))
+      self.timers.insert(at: i, value: Timer(due, user: some(value: u), user_name: name.copy(), text: text.copy()))
       print(text: "reminder for {name} set for tick {due}")
     } else {
       print(text: "remind failed: {name} is not here")
@@ -223,18 +223,18 @@ type Server {
   }
 
   fn cmd_move(mut self, name: Str, room: Str) {
-    if u = self.find_user(name: name) {
-      self.exit_room(u: u)
-      self.enter_room(u: u, room_name: room)
+    if u = self.find_user(name) {
+      self.exit_room(u)
+      self.enter_room(u, room_name: room)
     } else {
       print(text: "move failed: {name} is not here")
     }
   }
 
   fn cmd_leave(mut self, name: Str) {
-    if u = self.find_user(name: name) {
-      self.exit_room(u: u)
-      self.free_user(u: u)
+    if u = self.find_user(name) {
+      self.exit_room(u)
+      self.free_user(u)
     } else {
       print(text: "leave failed: {name} is not here")
     }
@@ -243,9 +243,9 @@ type Server {
   fn cmd_stats(self) {
     self.jobs.flush()
     lock self.stats {
-      print(text: ("stats: users={self.users.len()} rooms={self.rooms.len()}"
+      print(text: "stats: users={self.users.len()} rooms={self.rooms.len()}"
         + " messages={self.stats.messages}"
-        + " archived_rooms={self.stats.archived_rooms}"))
+        + " archived_rooms={self.stats.archived_rooms}")
       for line in self.stats.archive { print(text: "  archive {line}") }
     }
   }
@@ -288,13 +288,13 @@ fn archive_worker(jobs: Channel of Job, stats: Mutex of Stats) {
 fn main() fails {
   let jobs = Channel of Job()
   let stats = Mutex(value: Stats())
-  var srv = Server(jobs: jobs, stats: stats)
+  var srv = Server(jobs, stats)
   try crew c {
-    c.go(task: fn() => archive_worker(jobs: jobs, stats: stats))
+    c.go(task: fn() => archive_worker(jobs, stats))
     for line in stdin.lines() {
       if line.is_empty() or line.starts_with(prefix: "#") { continue }
       print(text: "> {line}")
-      srv.handle(line: line)
+      srv.handle(line)
     }
     jobs.close()
   } else e {

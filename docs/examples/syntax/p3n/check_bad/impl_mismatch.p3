@@ -1,0 +1,9 @@
+# expect: the interface declares
+iface Sized {
+  fn grow(self, by: Int) -> Int
+}
+type Box {
+  n: Int
+  fn grow(self, amount: Int) -> Int { return self.n + amount }
+}
+impl Sized for Box

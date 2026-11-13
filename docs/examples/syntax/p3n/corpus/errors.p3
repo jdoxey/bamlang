@@ -38,10 +38,10 @@ type Parser {
     if eq = line.find(text: "=") {
       let key = line.before(sep: eq).trim()
       if key.is_empty() { fail parse, "config.ini:{no}: empty key" }
-      if self.cfg.get(section: self.section, key: key).is_some() {
+      if self.cfg.get(section: self.section, key).is_some() {
         fail parse, "config.ini:{no}: duplicate key '{key}' in [{self.section}]"
       }
-      self.cfg.entries.push(item: Entry(section: self.section, key: key, value: line.after(sep: eq).trim()))
+      self.cfg.entries.push(item: Entry(section: self.section, key, value: line.after(sep: eq).trim()))
     } else {
       fail parse, "config.ini:{no}: missing '='"
     }
@@ -76,14 +76,14 @@ fn part1() fails {
     Err(e) => print(text: "fail-fast: {e}")
   }
   var report = Report.new()
-  _ = parse_all(text: BAD_TEXT, report: report)
+  _ = parse_all(text: BAD_TEXT, report)
   print(text: "collect-all:")
   for e in report.errors() { print(text: "  {e}") }
   print(text: "{report.count()} errors")
 
   let cfg = try parse_fail_fast(text: GOOD_TEXT)
   if s = cfg.get(section: "server", key: "port") {
-    let port = try parse_int(s: s) context "server.port"
+    let port = try parse_int(s) context "server.port"
     print(text: "server.port = {port}")
   }
   if s = cfg.get(section: "server", key: "timeout") {
@@ -102,17 +102,17 @@ fn replace_file(dir: Path, name: Str, content: Str, fail_at: Int) fails {
   let txn = Txn.new(undo: fn() { remove(path: tmp) })          # undo unless commit; cannot fail
   let held = try Lock.create(path: lock_path) context "step 1: create lock"
   txn.on_undo(action: fn() => held.abandon())
-  try inject(fail_at: fail_at, step: 1) context "step 1: create lock"
+  try inject(fail_at, step: 1) context "step 1: create lock"
 
   let f = try File.create(path: tmp) context "step 2: write temp"
   try f.write(text: content) context "step 2: write temp"
   try f.close() context "step 2: write temp"      # explicit fallible cleanup
-  try inject(fail_at: fail_at, step: 2) context "step 2: write temp"
+  try inject(fail_at, step: 2) context "step 2: write temp"
 
-  try inject(fail_at: fail_at, step: 3) context "step 3: rename temp"
+  try inject(fail_at, step: 3) context "step 3: rename temp"
   try rename(from: tmp, to: dst) context "step 3: rename temp"
 
-  try inject(fail_at: fail_at, step: 4) context "step 4: remove lock"
+  try inject(fail_at, step: 4) context "step 4: remove lock"
   try held.close() context "step 4: remove lock"   # consuming close
   txn.commit()                                       # success: undo does not run
 }
@@ -123,7 +123,7 @@ fn part2() fails {
   try write(path: dir / "data.txt", text: "old") context "seed data.txt"
   let labels = ["no failure", "fail at step 1", "fail at step 2", "fail at step 3", "fail at step 4"]
   for run in 0..5 {
-    let res = match replace_file(dir: dir, name: "data.txt", content: "v{run + 1}", fail_at: run) {
+    let res = match replace_file(dir, name: "data.txt", content: "v{run + 1}", fail_at: run) {
       Ok(_)  => "ok"
       Err(e) => "error: {e}"
     }
@@ -136,12 +136,12 @@ fn part2() fails {
 }
 
 fn worker(n: Int, text: Str) -> Int fails {
-  let cfg = try parse_fail_fast(text: text) context "worker {n}"
+  let cfg = try parse_fail_fast(text) context "worker {n}"
   return cfg.len()
 }
 
 fn worker3(text: Str, m: Mutex of Int, mut tally: Int) -> Int fails {
-  let cfg = try parse_fail_fast(text: text) context "worker 3"
+  let cfg = try parse_fail_fast(text) context "worker 3"
   lock m {                                           # released by unwinding; mutex poisoned
     tally += 10
     let keys = cfg.keys()
@@ -157,7 +157,7 @@ fn part3() fails {
   _ = try crew c {                                   # converts a CHILD's trap to Error{kind: trap} at the brace
     c.go(task: fn() => worker(n: 1, text: TEXTS[0]))
     c.go(task: fn() => worker(n: 2, text: TEXTS[1]))
-    c.go(task: fn() => worker3(text: TEXTS[2], m: m, tally: tally))
+    c.go(task: fn() => worker3(text: TEXTS[2], m, tally))
     c.go(task: fn() => worker(n: 4, text: TEXTS[3]))
   } else e {
     print(text: "error: {e}")                              # error: worker 2: config.ini:2: missing '=' (plus 1 more)

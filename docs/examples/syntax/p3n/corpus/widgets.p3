@@ -54,7 +54,7 @@ fn acquire_image(file: Str) -> Handle of CacheEntry {
   }
   let bytes = file.repeat(times: 100)
   print(text: "  cache: new {file} ({bytes.len()} bytes)")
-  return cache.add(value: CacheEntry(file: file.copy(), bytes: bytes, users: 1))
+  return cache.add(value: CacheEntry(file: file.copy(), bytes, users: 1))
 }
 
 fn release_image(h: Handle of CacheEntry) {
@@ -69,7 +69,7 @@ fn release_image(h: Handle of CacheEntry) {
 
 # ---- model and subscribers
 fn subscribe(run: fn(me: Handle of Sub)) -> Handle of Sub {
-  let h = subs.add(value: Sub(run: run))
+  let h = subs.add(value: Sub(run))
   sub_order.push(item: h)
   return h
 }
@@ -112,7 +112,7 @@ fn find_widget(name: Str) -> Handle of Widget {
 }
 
 fn new_widget(parent: Handle of Widget, kind: Kind, name: Str, arg: Str) -> Handle of Widget {
-  var w = Widget(kind: kind, name: name.copy(), text: arg.copy(), parent: parent)
+  var w = Widget(kind, name: name.copy(), text: arg.copy(), parent)
   if kind == Kind.Image { w.img = acquire_image(file: arg) }
   let subscribing = kind == Kind.Label and (arg == "count" or arg == "count-once")
   if subscribing { w.text = "count={count}" }
@@ -120,7 +120,7 @@ fn new_widget(parent: Handle of Widget, kind: Kind, name: Str, arg: Str) -> Hand
   if parent == none { windows.push(item: h) } else { widgets[parent].kids.push(item: h) }
   if subscribing {
     let once = arg == "count-once"
-    widgets[h].sub = subscribe(run: fn(me) => label_changed(label: h, me: me, once: once))
+    widgets[h].sub = subscribe(run: fn(s) => label_changed(label: h, me: s, once))
     print(text: "  subscribed {name}")
   }
   return h
@@ -207,14 +207,14 @@ fn need(a: Optional of Str, what: Str) -> Str fails {
 }
 
 fn find_label(name: Str) -> Handle of Widget fails {
-  let h = find_widget(name: name)
+  let h = find_widget(name)
   if h == none or widgets[h].kind != Kind.Label { fail "no such label {name}" }
   return h
 }
 
 fn cmd_window(name: Str) {
-  if find_widget(name: name) != none { error(text: "name {name} already exists"); return }
-  new_widget(parent: none, kind: Kind.Window, name: name, arg: "")
+  if find_widget(name) != none { error(text: "name {name} already exists"); return }
+  new_widget(parent: none, kind: Kind.Window, name, arg: "")
   print(text: "created window {name}")
 }
 
@@ -227,14 +227,14 @@ fn cmd_add(parent_name: Str, kind_name: Str, name: Str, arg: Optional of Str) {
   }
   let kind = Kind.parse(text: kind_name)
   if kind == none or kind == Kind.Window { error(text: "unknown kind {kind_name}"); return }
-  if find_widget(name: name) != none { error(text: "name {name} already exists"); return }
+  if find_widget(name) != none { error(text: "name {name} already exists"); return }
   if kind == Kind.Image and arg == none { error(text: "image {name} needs a file name"); return }
-  new_widget(parent: p, kind: kind, name: name, arg: arg ?? "")
+  new_widget(parent: p, kind, name, arg: arg ?? "")
   print(text: "added {kind_name} {name} to {parent_name}")
 }
 
 fn cmd_on(name: Str, action: Str, arg: Optional of Str) fails {
-  let b = find_widget(name: name)
+  let b = find_widget(name)
   if b == none { error(text: "no such widget {name}"); return }
   if widgets[b].kind != Kind.Button { error(text: "{name} is not a button"); return }
   let cb = match action {
@@ -257,7 +257,7 @@ fn cmd_on(name: Str, action: Str, arg: Optional of Str) fails {
 }
 
 fn cmd_click(name: Str) {
-  let h = find_widget(name: name)
+  let h = find_widget(name)
   if h == none { error(text: "no such widget {name}"); return }
   if b = widgets.get(handle: h) {
     if b.kind != Kind.Button {
@@ -272,9 +272,9 @@ fn cmd_click(name: Str) {
 }
 
 fn cmd_remove(name: Str) {
-  let h = find_widget(name: name)
+  let h = find_widget(name)
   if h == none { error(text: "no such widget {name}"); return }
-  remove_widget(h: h)
+  remove_widget(h)
   print(text: "removed {name}")
 }
 
@@ -295,7 +295,7 @@ fn print_tree(h: Handle of Widget, depth: Int) {
 
 fn cmd_tree() {
   if windows.is_empty() { print(text: "(no windows)") }
-  for h in windows { print_tree(h: h, depth: 0) }
+  for h in windows { print_tree(h, depth: 0) }
 }
 
 fn cmd_stats() {

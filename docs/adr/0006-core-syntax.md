@@ -1,9 +1,9 @@
 # ADR-0006: Core syntax
 
 - **Status:** Accepted
-- **Date:** 2026-11-13
+- **Date:** 2026-11-13; amendment 1 (named arguments, issue #4) 2026-11-14
 - **Tier:** Full (see `docs/PROCESS.md`)
-- **Examples:** `docs/examples/syntax` (P3 in `p3/`; rivals in `p1/`, `p2/`; the shared AST format is in `AST.md`)
+- **Examples:** `docs/examples/syntax` (amended P3 in `p3n/`; P3 in `p3/`; rivals in `p1/`, `p2/`; the shared AST format is in `AST.md`)
 - **Decided by:** Claude (ruling R7). John may veto by opening an issue.
 
 ## Context
@@ -151,6 +151,64 @@ because P3 is a meaning-preserving subset of P1, so it is the reversible choice.
 - M0: `tests/corpus/` is created from the P3 corpus and its `bad/` files. Conformance tests are append-only.
 - M2: the F9 unreachable and unused-value checks; `try` as the outermost operation.
 
+## Amendment 1: named arguments (issue #4, 2026-11-14)
+
+John asked for named parameters "similar to Swift, but much simpler: every parameter has a name, and there is no
+difference in internal / external names". Process record: `0006-research/named/` (criteria, research, ideas, scores,
+`review-f1.md`). Example: `docs/examples/syntax/p3n/`, the whole corpus relabelled, with a strict parser, a meaning
+check against P3 and a label checker against declarations.
+
+**Rules (they replace "Lambdas" in rule 10 where they differ, and add to rule 6):**
+
+1. **Every argument is labelled.** Each call argument is `name: value`, in declaration order. Defaulted parameters may
+   be skipped, and a label may not repeat. This covers functions, methods, built-ins, struct and variant construction,
+   and calls through function values. A parameter has one name, used both in the body and at the call.
+2. **Pun.** An argument that is exactly one lowercase identifier (not `self`, not in parentheses) means `name: name`.
+   `f(count)` never means "the first parameter"; with no parameter `count` it is an error: "write `count: n`".
+3. **No variadics.** `print(text: Str)` takes one string, built with interpolation.
+4. **Function types name their parameters:** `fn(mut srv: Server, room: Handle of Room) -> Str`. The names are part of
+   the type. A named function passes as a value only if its names match; otherwise wrap it: `fn(x) => double(n: x)`.
+   **Lambda parameter names are free** and bind by position, like pattern binders.
+5. **Variant fields are named** (`Rect(w: Float, h: Float)`) and never defaulted. Patterns bind by position, but a
+   binder named after a *different* field of that variant is an error (`Rect(h, w) =>`).
+6. **An `impl` uses its interface's parameter names.**
+7. **The complete list of unlabelled forms:** the receiver, `.key` arguments (which may not repeat), pattern binders,
+   puns, operators and indexing.
+
+**What the example showed** (`p3n/measure.py`, `review-f1.md`):
+- **Cost:** +8.0% characters of code (+6.0% of whole files), and the same line count. Lines over 100 columns go from
+  23 to 32.
+- **Puns:** 75 of 466 labels.
+- **`print(text: …)`:** 83 of the labels, the largest single source of noise.
+- **Checks:**
+  - The meaning check proves the labelled corpus has P3's ASTs.
+  - `check_labels.py` verifies 345 of 479 calls against declarations. The rest need receiver types, so they wait for
+    M2.
+  - 15 new bad files.
+
+| Option | Owner fit 25 | Simple 20 | Read 20 | Brevity 15 | Evolve 10 | Impl 10 | Total |
+|---|---|---|---|---|---|---|---|
+| **F1b** (these rules) | 4 | 4 | 4 | 3 | 3 | 4 | **75** |
+| F3: function values called positionally (Swift SE-0111) | 3 | 4 | 4 | 3 | 3 | 4 | 70 |
+| F1 as first proposed (forced lambda names) | 4 | 3 | 4 | 3 | 2 | 3 | 67 |
+| F2: one-parameter calls unlabelled | 2 | 3 | 4 | 5 | 2 | 4 | 65 |
+
+The margin is 5. If Owner fit were weighted 10 and Brevity 30, F2 would win 74 to 72. So the decision rests on
+following John's stated preference. **F2 is the ready fallback** if John prefers `print("hi")`.
+
+**Traded away:**
+- Brevity: +8% of code.
+- Renaming or reordering a parameter breaks every caller, though always as a compile error.
+- Wrapper lambdas, where a function's names differ from a callback type's.
+
+**Library guideline (D10):** make the natural operand the receiver: `x.clamp(low: 0, high: 9)`, `a.max(other: b)`.
+
+**Passed on:**
+- D7: the D2 "variadic" option is ruled out, and D1/D3 must be rebased on `p3n`.
+- D9: FFI declarations name every parameter.
+- M0: the corpus comes from `p3n`.
+- M2: the label, order, swap-guard and impl-name checks.
+
 ## Syntax budget impact
 
 | Item | Count |
@@ -165,4 +223,5 @@ because P3 is a meaning-preserving subset of P1, so it is the reversible choice.
 
 | Review | Findings | Outcome |
 |---|---|---|
+| `0006-research/named/review-f1.md` (amendment 1, Fable 5.2) | Fatal: forced lambda names vs no shadowing; pattern swaps; loose puns; iface names; variadics; understated cost; weak meaning check | All fixed (F1b); scores corrected to 75 vs 70 |
 | `0006-research/review-p3.md` | F1 a missing comma joins lines in brackets; F2 `try … or` overload; F3 reserved words block names; F4 commas in bodies; F5 capitalisation; F11 closer diagnostics; F6–F10, F12 | All adopted. `try … else e`; contextual keywords; capitalised types. Scores corrected; margin 6, backed by reversibility. |

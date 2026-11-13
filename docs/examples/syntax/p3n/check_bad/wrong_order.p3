@@ -1,0 +1,3 @@
+# expect: out of declaration order
+fn pad(text: Str, width: Int) -> Str { return text }
+fn main() { let s = pad(width: 3, text: "a") }

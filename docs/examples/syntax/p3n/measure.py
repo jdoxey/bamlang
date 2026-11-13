@@ -1,8 +1,55 @@
-"""Measures the three finalists of ADR-0006 amendment 1 on the fully labelled corpus (p3n/expected/*.ast).
-F1: strict, with the pun f(x) for f(x: x). F2: F1 plus one-parameter calls unlabelled. F3: F1 with positional calls
-through function values (counted from same_meaning output by hand: 8 calls, 7 function-type labels)."""
-import sys, glob, os
+"""Measures the F1b corpus (p3n, already punned) against the positional P3 corpus. No subtraction: p3n/corpus is counted.
+Per side: whole-file chars; code-only chars (comments, leading indentation, trailing blanks and newlines dropped);
+code minus the literal text of string literals; lines over 100 and 120 columns.
+F2 (one-argument labels removed) is derived from p3n/expected/*.ast: each call with exactly one named, non-pun argument
+saves len(label)+2 characters."""
+import glob, os
 here = os.path.dirname(os.path.abspath(__file__))
+
+def classify(src):
+    """Return (code_lines, str_chars): code_lines are the lines with comments removed; str_chars counts literal text."""
+    lines, cur, strc = [], [], 0
+    stack = []                     # 'S' inside string text, or an int brace depth inside an interpolation
+    i, n = 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == '\r': i += 1; continue
+        top = stack[-1] if stack else None
+        if c == '\n':
+            lines.append(''.join(cur)); cur = []; i += 1; continue
+        if top == 'S':
+            if c == '\\' and i + 1 < n:
+                cur.append(src[i:i+2]); strc += 2 if src[i+1] != '\n' else 1; i += 2; continue
+            if c == '"': stack.pop(); cur.append(c); i += 1; continue
+            if c == '{': stack.append(0); cur.append(c); i += 1; continue
+            cur.append(c); strc += 1; i += 1; continue
+        # code (top level or inside an interpolation)
+        if c == '"': stack.append('S'); cur.append(c); i += 1; continue
+        if c == '#' and not stack:
+            while i < n and src[i] != '\n': i += 1
+            continue
+        if stack:
+            if c == '{': stack[-1] += 1
+            elif c == '}':
+                if stack[-1] == 0: stack.pop(); cur.append(c); i += 1; continue
+                stack[-1] -= 1
+        cur.append(c); i += 1
+    lines.append(''.join(cur))
+    return lines, strc
+
+def stats(dirname):
+    whole = code = nostr = o100 = o120 = 0
+    for f in sorted(glob.glob(os.path.join(here, dirname, 'corpus', '*.p3'))):
+        with open(f, encoding='utf-8', newline='') as fh: src = fh.read().replace('\r\n', '\n')
+        whole += len(src)
+        lines, strc = classify(src)
+        c = sum(len(l.strip()) for l in lines)
+        code += c; nostr += c - strc
+        for l in src.split('\n'):
+            if len(l) > 100: o100 += 1
+            if len(l) > 120: o120 += 1
+    return dict(whole=whole, code=code, nostr=nostr, o100=o100, o120=o120)
+
 def toks(s):
     i, out = 0, []
     while i < len(s):
@@ -18,6 +65,7 @@ def toks(s):
             while j < len(s) and not s[j].isspace() and s[j] not in '()': j += 1
             out.append(s[i:j]); i = j
     return out
+
 def parse(ts):
     st = [[]]
     for t in ts:
@@ -25,28 +73,31 @@ def parse(ts):
         elif t == ')': x = st.pop(); st[-1].append(x)
         else: st[-1].append(t)
     return st[0]
-tot = dict(labels=0, label_chars=0, puns=0, pun_saved=0, one_arg=0, one_arg_saved=0, print_=0)
+
+tot = dict(labels=0, puns=0, one_arg=0, one_arg_saved=0)
 def walk(n):
     if not isinstance(n, list) or not n: return
     if n[0] in ('call', 'mcall', 'mcall?'):
         args = n[2:] if n[0] == 'call' else n[3:]
         named = [a for a in args if isinstance(a, list) and a and a[0] == 'named']
         for a in named:
-            tot['labels'] += 1; tot['label_chars'] += len(a[1]) + 2
-            if a[2] == ['name', a[1]]: tot['puns'] += 1; tot['pun_saved'] += len(a[1]) + 2
-        if len(args) == 1 and named:
-            a = named[0]
-            tot['one_arg'] += 1
-            # F2 saves the label only where F1's pun did not already remove it
-            if a[2] != ['name', a[1]]: tot['one_arg_saved'] += len(a[1]) + 2
-        if n[0] == 'call' and n[1] == ['name', 'print']: tot['print_'] += 1
+            tot['labels'] += 1
+            if a[2] == ['name', a[1]]: tot['puns'] += 1
+        if len(args) == 1 and named and named[0][2] != ['name', named[0][1]]:
+            tot['one_arg'] += 1; tot['one_arg_saved'] += len(named[0][1]) + 2
     for c in n: walk(c)
-chars = 0
+
 for f in sorted(glob.glob(os.path.join(here, 'expected', '*.ast'))):
-    walk(parse(toks(open(f).read())))
-for f in glob.glob(os.path.join(here, 'corpus', '*.p3')): chars += len(open(f).read())
-old = sum(len(open(f).read()) for f in glob.glob(os.path.join(here, '..', 'p3', 'corpus', '*.p3')))
-f1 = chars - tot['pun_saved']; f2 = f1 - tot['one_arg_saved']
-print(f"labels={tot['labels']} puns={tot['puns']} one_arg_calls={tot['one_arg']} print={tot['print_']}")
-print(f"chars: positional P3 {old}; written out {chars} (+{100*(chars-old)/old:.1f}%)")
-print(f"F1 strict+pun {f1} (+{100*(f1-old)/old:.1f}%); F2 one-param exempt {f2} (+{100*(f2-old)/old:.1f}%); F3 ~F1 minus 8 call labels")
+    with open(f, encoding='utf-8') as fh: walk(parse(toks(fh.read())))
+
+a, b = stats(os.path.join('..', 'p3')), stats('.')
+def pct(x, y): return "%+.1f%%" % (100.0 * (y - x) / x)
+print("%-28s %8s %8s %8s" % ("", "P3", "P3n F1b", "change"))
+for key, label in (('whole', 'whole-file chars'), ('code', 'code-only chars'), ('nostr', 'code minus string text'),
+                   ('o100', 'lines over 100 cols'), ('o120', 'lines over 120 cols')):
+    ch = pct(a[key], b[key]) if a[key] else "%+d" % (b[key] - a[key])
+    print("%-28s %8d %8d %8s" % (label, a[key], b[key], ch))
+print("labelled args %d (puns %d); one-argument non-pun labels %d, %d chars" % (tot['labels'], tot['puns'], tot['one_arg'], tot['one_arg_saved']))
+for key, label in (('whole', 'whole-file'), ('code', 'code-only'), ('nostr', 'code minus strings')):
+    f2 = b[key] - tot['one_arg_saved']
+    print("F2 estimate (derived), %-18s %8d (%s vs P3)" % (label, f2, pct(a[key], f2)))

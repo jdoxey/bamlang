@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """same_meaning.py OLD.ast NEW.ast -- checks the labelled AST means the same as the unlabelled one.
-Allowed differences (all printed): label added in a call (named L X where OLD had X), fnt (arg NAME [mode] T) for
-old T / (mut T) / (take T), vfield names added, and parameter / lambda-parameter renames (name atom changes in a
-param node or in uses of a renamed lambda parameter; reported). Anything else: exit 1."""
+Allowed differences (all printed): label added in a call (named L X where OLD had X; labels in one call must be
+distinct), fnt (arg NAME [mode] T) for old T / (mut T) / (take T), vfield names added, and lambda-parameter renames.
+A rename must be injective, must not capture a name free in the body, and applies only to (name X) nodes, never to
+field or method names. Anything else: exit 1. (Whether labels match declarations is check_labels.py's job.)"""
 import sys, re, collections
 
 def parse(text):
@@ -36,10 +37,43 @@ errors = []
 def lam_params(n):
     return [c[1] for c in n[1:] if isinstance(c, list) and c[0] == 'param']
 
+def names_in(n, out):
+    if isinstance(n, list):
+        if n and n[0] == 'name' and len(n) > 1 and isinstance(n[1], str): out.add(n[1])
+        for c in n: names_in(c, out)
+
+def cmp_lambda(o, n, path, ren):
+    ops, nps = lam_params(o), lam_params(n)
+    if len(ops) != len(nps): errors.append("%s: lambda arity differs" % path); return
+    news = [b for b in nps if b != '_']
+    if len(news) != len(set(news)): errors.append("%s: lambda parameter names repeat" % path)
+    body = [c for c in o[1:] if not (isinstance(c, list) and c[0] == 'param')]
+    free = set(); names_in(body, free); free -= set(ops)
+    r2 = dict(ren)
+    for a, b in zip(ops, nps):
+        if a == '_' or b == '_':
+            if a != b: errors.append("%s: lambda rename involves _" % path)
+            continue
+        if a != b:
+            if b in free or b in ren.values():
+                errors.append("%s: lambda rename %s -> %s captures a name" % (path, a, b))
+            renames[path] = renames.get(path, []) + ["%s -> %s" % (a, b)]
+            print("allowed lambda rename %s: %s -> %s" % (path, a, b))
+        r2[a] = b
+    for k, (x, y) in enumerate(zip(o[1:], n[1:])):
+        if isinstance(x, list) and x[0] == 'param':
+            if not (isinstance(y, list) and y[0] == 'param' and len(x) == len(y)):
+                errors.append("%s: lambda param shape differs" % path); continue
+            for u, v in zip(x[2:], y[2:]):
+                if isinstance(u, str) or isinstance(v, str):
+                    if u != v: errors.append("%s: lambda param differs" % path)
+                else: cmp(u, v, path + '/param', ren)
+        else:
+            cmp(x, y, path + '/lam' + str(k), r2)
+
 def cmp(o, n, path, ren):
     if isinstance(o, str) or isinstance(n, str):
         if o != n:
-            if o in ren and ren[o] == n or (n in ren.values() and False): return
             errors.append("%s: %s != %s" % (path, o, n))
         return
     # fnt: old args (types, (mut T), (take T)) vs new (arg NAME [mode] T)
@@ -84,19 +118,9 @@ def cmp(o, n, path, ren):
             errors.append("%s: %s method differs" % (path, o[0])); return
         start = 1 if o[0] == 'call' else 2
         oc, nc = o[start:], n[start:]
-        if (len(oc) != len(nc) and o[0] == 'call' and oc[0] == ['name', 'print'] and len(nc) == 2
-                and nc[1][0] == 'named'):
-            # amendment rule: no repeated labels, so a multi-argument print becomes one `+` concatenation
-            parts, e = [], nc[1][2]
-            while isinstance(e, list) and e[0] == 'bin' and e[1] == '+':
-                parts.insert(0, e[3]); e = e[2]
-            parts.insert(0, e)
-            if len(parts) == len(oc) - 1:
-                allowed['print-concat'] += 1
-                print("allowed print concat %s: %d args" % (path, len(parts)))
-                for x, y in zip(oc[1:], parts): cmp(x, y, path + '/arg', ren)
-                return
         if len(oc) != len(nc): errors.append("%s: arg count differs" % path); return
+        labels = [c[1] for c in nc if isinstance(c, list) and c[0] == 'named']
+        if len(labels) != len(set(labels)): errors.append("%s: label repeated in one call" % path)
         # first child is callee / receiver
         cmp(oc[0], nc[0], path + '/' + o[0], ren)
         for k, (x, y) in enumerate(zip(oc[1:], nc[1:])):
@@ -110,18 +134,11 @@ def cmp(o, n, path, ren):
         return
     if o[0] != n[0] or len(o) != len(n):
         errors.append("%s: %s vs %s" % (path, fmt(o)[:70], fmt(n)[:70])); return
-    if o[0] in ('lambda',):
-        # parameter renames inside a lambda: map old name -> new name, applied in the body
-        ops = lam_params(o); nps = lam_params(n)
-        r2 = dict(ren)
-        for a, b in zip(ops, nps):
-            if a != b:
-                r2[a] = b; renames[path] = renames.get(path, []) + ["%s -> %s" % (a, b)]
-                print("allowed lambda rename %s: %s -> %s" % (path, a, b))
-        ren = r2
+    if o[0] == 'lambda':
+        cmp_lambda(o, n, path, ren); return
     for k, (x, y) in enumerate(zip(o, n)):
         if isinstance(x, str) and isinstance(y, str):
-            if x != y and not (ren.get(x) == y):
+            if x != y and not (o[0] == 'name' and k == 1 and ren.get(x) == y):
                 errors.append("%s: atom %s != %s (in %s)" % (path, x, y, o[0]))
         else:
             if isinstance(x, str) != isinstance(y, str):

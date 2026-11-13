@@ -1,0 +1,3 @@
+# expect: has no parameter 'wid'
+fn pad(text: Str, width: Int) -> Str { return text }
+fn main() { let s = pad(text: "a", wid: 3) }

@@ -33,6 +33,28 @@ for n in chatsim widgets errors types tricky; do
     echo "FAIL $n: labelled AST differs in meaning from ../p3/expected/$n.ast"; grep '^DIFF' "$tmp/sm.$n" | head; fail=1
   else tail -1 "$tmp/sm.$n" | sed "s/^/$n: /"; fi
 done
+# same_meaning.py must reject its known false-accept cases (sm_tests/*.old.ast vs *.new.ast); ok_* must pass
+for o in sm_tests/*.old.ast; do
+  t=${o%.old.ast}; b=$(basename "$t")
+  if "$PY" same_meaning.py "$o" "$t.new.ast" >/dev/null 2>&1; then rc=0; else rc=1; fi
+  case "$b" in
+    ok_*) if [ $rc -ne 0 ]; then echo "FAIL sm_tests/$b: should be accepted"; fail=1; fi ;;
+    *) if [ $rc -eq 0 ]; then echo "FAIL sm_tests/$b: should be rejected"; fail=1; fi ;;
+  esac
+done
+# labels versus declarations (rules 1, 6, 7)
+for n in chatsim widgets errors types tricky; do
+  if ! "$PY" check_labels.py "corpus/$n.p3" > "$tmp/cl" 2>&1; then echo "FAIL $n: check_labels"; cat "$tmp/cl"; fail=1
+  else sed "s/^/$n: /" "$tmp/cl"; fi
+done
+for f in check_bad/*.p3; do
+  exp=$(head -1 "$f" | sed -n 's/^# expect: *\(.*\)$/\1/p' | tr -d '\r')
+  if "$PY" check_labels.py "$f" >/dev/null 2>"$tmp/err"; then echo "FAIL $f: accepted, expected an error"; fail=1; continue; fi
+  case "$(cat "$tmp/err")" in
+    *"$exp"*) ;;
+    *) echo "FAIL $f: expected '$exp', got: $(cat "$tmp/err")"; fail=1 ;;
+  esac
+done
 rm -rf "$tmp"
 if [ $fail -ne 0 ]; then exit 1; fi
 echo "p3n syntax corpus OK"

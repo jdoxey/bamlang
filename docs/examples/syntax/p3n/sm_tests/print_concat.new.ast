@@ -1,0 +1,1 @@
+(file (call (name print) (named text (bin + (name a) (name b)))))

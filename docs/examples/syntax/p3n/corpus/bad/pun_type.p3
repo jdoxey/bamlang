@@ -1,0 +1,2 @@
+# expect: 2: argument needs a name
+fn main() { f(Red) }

@@ -823,10 +823,13 @@ class Parser:
         while not s.isop(')'):
             st = s.peek()
             a = s.arg()
-            if a.k == 'named':
-                if a.a[0] in seen:
-                    s.fail("label '%s' appears twice in one call" % a.a[0], st)
-                seen.add(a.a[0])
+            if a.k in ('named', 'key'):
+                nm = a.a[0]
+                if nm in seen:
+                    if a.k == 'key':
+                        s.fail("key argument '.%s' appears twice in one call" % nm, st)
+                    s.fail("label '%s' appears twice in one call" % nm, st)
+                seen.add(nm)
             out.append(a)
             if not s.accop(','):
                 break
@@ -853,10 +856,12 @@ class Parser:
             s.i += 1
             return N('named', [name], [s.expr()])
         st = s.peek()
+        i0 = s.i
         e = s.expr()
-        if e.k == 'name':
-            return N('named', list(e.a), [e])      # pun: `x` means `x: x`
-        s.fail("argument needs a name: write 'name: value'", st)
+        # pun: exactly one lowercase identifier token (not self, not capitalised, not parenthesised)
+        if e.k == 'name' and s.i - i0 == 1 and st.k == 'id' and (st.v[0].islower() or st.v[0] == '_'):
+            return N('named', list(e.a), [e])      # `x` means `x: x`
+        s.fail("argument needs a name: write 'name: value' (a pun is one lowercase identifier, not self, a type or a parenthesised name)", st)
     def primary(s):
         t = s.peek()
         k = t.k
@@ -976,6 +981,12 @@ class Parser:
         s.expop('(', " after 'fn'")
         ps = s.params()
         s.expop(')')
+        seen = set()
+        for p in ps:
+            if p.k == 'param' and p.a and p.a[0] != '_':
+                if p.a[0] in seen:
+                    s.fail("lambda parameter '%s' appears twice" % p.a[0])
+                seen.add(p.a[0])
         if s.accop('=>'):
             st = s.peek()
             e = s.expr()

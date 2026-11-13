@@ -243,11 +243,9 @@ type Server {
   fn cmd_stats(self) {
     self.jobs.flush()
     lock self.stats {
-      print(
-        "stats: users={self.users.len()} rooms={self.rooms.len()}",
-        " messages={self.stats.messages}",
-        " archived_rooms={self.stats.archived_rooms}",
-      )
+      print("stats: users={self.users.len()} rooms={self.rooms.len()}"
+        + " messages={self.stats.messages}"
+        + " archived_rooms={self.stats.archived_rooms}")
       for line in self.stats.archive { print("  archive {line}") }
     }
   }

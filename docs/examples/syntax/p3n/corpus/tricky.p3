@@ -64,7 +64,7 @@ fn t6(a: Int, b: Int, c: Int) -> Bool {
 fn t7(items: List of Int, c: Crew) {
   c.go(task: fn() {
     for x in items {
-      print(text: x)
+      print(text: "{x}")
     }
   })
   if items.is_empty() {
@@ -153,4 +153,23 @@ fn t13(m: Map of List of Int to Bool, l: Lru of Text to Int, s: SortedMap of Int
   let c = [1]
     .len()
   let d = "brace \{ ok"
+}
+
+# 14. a multi-field variant: built by field name, matched by position
+enum Shape2 {
+  Rect(w: Float, h: Float),
+  Dot,
+}
+fn t14() -> Float {
+  let s = Rect(w: 3.0, h: 4.0)
+  return match s {
+    Rect(w, h) => w * h,
+    Dot => 0.0,
+  }
+}
+
+# 15. a call with labels inside an interpolation, with a format spec
+fn pad(text: Str, width: Int) -> Str { return text }
+fn t15(a: Str) -> Str {
+  return "{pad(text: a, width: 3):>5}"
 }

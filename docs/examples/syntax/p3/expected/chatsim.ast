@@ -1123,29 +1123,31 @@
           (block
             (call
               (name print)
-              (interp
-                (s "stats: users=")
-                (part
-                  (mcall len
-                    (field users
-                      (name self))))
-                (s " rooms=")
-                (part
-                  (mcall len
-                    (field rooms
-                      (name self)))))
-              (interp
-                (s " messages=")
-                (part
-                  (field messages
-                    (field stats
-                      (name self)))))
-              (interp
-                (s " archived_rooms=")
-                (part
-                  (field archived_rooms
-                    (field stats
-                      (name self))))))
+              (bin +
+                (bin +
+                  (interp
+                    (s "stats: users=")
+                    (part
+                      (mcall len
+                        (field users
+                          (name self))))
+                    (s " rooms=")
+                    (part
+                      (mcall len
+                        (field rooms
+                          (name self)))))
+                  (interp
+                    (s " messages=")
+                    (part
+                      (field messages
+                        (field stats
+                          (name self))))))
+                (interp
+                  (s " archived_rooms=")
+                  (part
+                    (field archived_rooms
+                      (field stats
+                        (name self)))))))
             (for
               (pbind line)
               (field archive

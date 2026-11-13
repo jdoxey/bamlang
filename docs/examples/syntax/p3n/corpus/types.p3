@@ -18,7 +18,7 @@ module core {
 
     pub fn new(r: Float) -> Circle fails {
       if r <= 0.0 { fail "bad radius {r}" }
-      return Circle(r: r)
+      return Circle(r)
     }
     fn area(self) -> Float { return PI * self.r * self.r }
     fn name(self) -> Str { return "circle" }
@@ -30,7 +30,7 @@ module core {
 
     pub fn new(w: Float, h: Float) -> Rect fails {
       if w <= 0.0 or h <= 0.0 { fail "bad size {w}x{h}" }
-      return Rect(w: w, h: h)
+      return Rect(w, h)
     }
     fn area(self) -> Float { return self.w * self.h }
     fn name(self) -> Str { return "rect" }
@@ -58,7 +58,7 @@ module core {
         let c = children.take_out(at: i)
         return "consumed {c.close()}; {FOCUS}"
       }
-      ([i, ..rest], _) => return match children.get_mut(at: i) { some(c) => c.event(path: rest, ev: ev), none => "no such widget" }
+      ([i, ..rest], _) => return match children.get_mut(at: i) { some(c) => c.event(path: rest, ev), none => "no such widget" }
       _ => return "ignored"
     }
   }
@@ -68,10 +68,10 @@ module core {
     Button(label: Str)
     Ext(widget: dyn WidgetKind)
 
-    pub fn panel(children: List of Widget) -> Widget { return Panel(children: children) }
+    pub fn panel(children: List of Widget) -> Widget { return Panel(children) }
     pub fn button(label: Str) -> Widget fails {
       if label == "" { fail "empty label" }
-      return Button(label: label)
+      return Button(label)
     }
 
     fn render(self, depth: Int) -> Str {
@@ -82,15 +82,15 @@ module core {
           return out
         }
         Button(label) => return "{indent(levels: depth)}Button {label}\n"
-        Ext(d)        => return d.render(depth: depth)
+        Ext(d)        => return d.render(depth)
       }
     }
 
     fn event(mut self, path: List of Int, ev: Event) -> Str {
       match self {
-        Panel(children) => return route(children: children, path: path, ev: ev)
+        Panel(children) => return route(children, path, ev)
         Button(label)   => match ev { Click => return "pressed {label}; {FOCUS}", _ => return "ignored" }
-        Ext(d)          => return d.event(path: path, ev: ev)
+        Ext(d)          => return d.event(path, ev)
       }
     }
 
@@ -116,7 +116,7 @@ module core {
 
     pub fn new(cents: Int) -> Money fails {
       if cents < 0 { fail "negative money {cents}" }
-      return Money(cents: cents)
+      return Money(cents)
     }
     pub fn cents(self) -> Int { return self.cents }
     pub fn plus(self, o: Money) -> Money { return Money(cents: self.cents + o.cents) }
@@ -132,7 +132,7 @@ module core {
 
     pub fn new(owner: Str, balance: Money) -> Account fails {
       if owner == "" { fail "empty owner" }
-      return Account(owner: owner, balance: balance)
+      return Account(owner, balance)
     }
     pub fn deposit(mut self, m: Money) { self.balance = self.balance.plus(o: m) }
     pub fn withdraw(mut self, m: Money) fails {
@@ -144,8 +144,8 @@ module core {
   }
 
   pub fn transfer(mut pool: Pool of Account, a: Handle of Account, b: Handle of Account, m: Money) fails {
-    with src = pool[a] { try src.withdraw(m: m) }
-    with dst = pool[b] { dst.deposit(m: m) }
+    with src = pool[a] { try src.withdraw(m) }
+    with dst = pool[b] { dst.deposit(m) }
   }
 }
 
@@ -159,7 +159,7 @@ module plugin {
 
     pub fn new(side: Float) -> Hexagon fails {
       if side <= 0.0 { fail "bad side {side}" }
-      return Hexagon(side: side)
+      return Hexagon(side)
     }
     fn area(self) -> Float { return 3.0 * 3.0.sqrt() / 2.0 * self.side * self.side }
     fn name(self) -> Str { return "hexagon" }
@@ -198,14 +198,14 @@ module plugin {
 
     pub fn new(children: List of Widget) -> Tabs fails {
       if children.is_empty() { fail "empty tabs" }
-      return Tabs(children: children)
+      return Tabs(children)
     }
     fn render(self, depth: Int) -> Str {
       var out = "{indent(levels: depth)}Tabs\n"
       for c in self.children { out += c.render(depth: depth + 1) }
       return out
     }
-    fn event(mut self, path: List of Int, ev: Event) -> Str { return route(children: self.children, path: path, ev: ev) }
+    fn event(mut self, path: List of Int, ev: Event) -> Str { return route(children: self.children, path, ev) }
     fn close(take self) -> Str { return "Tabs[{self.children.map(each: fn(c) { c.close() }).join(sep: ", ")}]" }
   }
   impl WidgetKind for Tabs

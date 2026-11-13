@@ -60,10 +60,12 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
 - **Model each finalist's design, not its host language.** In ADR-0004, E2 was scored on Go's missing must-use check rather than on its own rule, which nearly decided the result.
 - **A review's own fixes create new decisions.** Each loop-2 example found 6–9 gaps in the reviewer's fixes. Budget for one clarification pass after loop 2, not just after the review.
 - **For syntax decisions, the real code is a parser per option, with all options checked against one shared AST.** It found what prose could not: P2's interpolation limit, and P3 being a strict subset of P1.
+- **A script that checks a rewrite must be attacked too.** In amendment 1 the meaning check accepted wrong labels and capturing renames until the reviewer probed it. Give every checker its own false-accept tests.
 - **A GUI example is too big.** Use a small scripted simulation that has the same lifetimes (see `docs/examples/chatsim/SPEC.md`).
 
 ## Changelog
 
+- 2026-11-14: lesson from ADR-0006 amendment 1 (attack the checkers).
 - 2026-11-13: lesson from ADR-0001's retro (second example).
 - 2026-11-13: Fable 5.2 for adversarial reviews until 2026-11-16 (John's message).
 - 2026-11-13: lesson from ADR-0006's retro (a parser per option, one shared AST).

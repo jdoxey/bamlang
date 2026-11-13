@@ -1,0 +1,3 @@
+# expect: missing required width
+fn pad(text: Str, width: Int) -> Str { return text }
+fn main() { let s = pad(text: "a") }

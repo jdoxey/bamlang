@@ -2,13 +2,13 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** your issue #4 (named parameters): amending ADR-0006 so every argument is `name: value`. D7 (DSL) is paused at step 3 and resumes after.
+- **Now:** D7 (DSL), resumed. Issue #4 done: ADR-0006 amendment 1, every argument is `name: value` (with `f(count)` as shorthand for `count: count`); cost +8% of code. If you'd rather have `print("hi")` than `print(text: "hi")`, say so on an issue: that fallback (one-parameter calls unlabelled) is ready.
 - **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (newline-terminated, braces, `Name(field: v)`; parser and corpus in `docs/examples/syntax/p3/`). Veto by opening an issue.
 - **Needs you:** nothing. Issue #3 answered (yes); your mitigations are in ADR-0002.
 
 ## Next action
 
-**Issue #4 first.** Amendment 1 to ADR-0006 (`docs/adr/0006-research/named/`). Steps 1-2 done. Step 3: `docs/examples/syntax/p3n/` (fully labelled corpus, strict parser, meaning check); measure F1 strict+pun, F2 one-parameter exemption, F3 positional function values. Step 4: Fable reviewer, scores, amend ADR-0006. Then redo D7's three parsers on top of p3n.
+**D7 step 3 redo:** amendment 1 rules out D2 (variadic). Rebase D1 clauses and D3 pipelines on `docs/examples/syntax/p3n/parser.py` (labelled corpus), relabel their DSL corpora, and rerun `compare.md` numbers. Then step 4: scores.py, Fable reviewer (until 2026-11-16), ADR-0007.
 
 
 Roadmap item **D7** (ADR-0007, Full). Inputs:

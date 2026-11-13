@@ -1,0 +1,11 @@
+# expect: different field of Rect
+enum Shape2 {
+  Rect(w: Float, h: Float),
+  Dot,
+}
+fn area(s: Shape2) -> Float {
+  return match s {
+    Rect(h, w) => w * h,
+    Dot => 0.0,
+  }
+}

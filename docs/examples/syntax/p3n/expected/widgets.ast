@@ -495,13 +495,13 @@
               (name subscribe)
               (named run
                 (lambda
-                  (param me)
+                  (param s)
                   (call
                     (name label_changed)
                     (named label
                       (name h))
                     (named me
-                      (name me))
+                      (name s))
                     (named once
                       (name once)))))))
           (call

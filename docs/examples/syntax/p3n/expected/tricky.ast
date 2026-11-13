@@ -139,7 +139,9 @@
                   (call
                     (name print)
                     (named text
-                      (name x)))))))))
+                      (interp
+                        (part
+                          (name x)))))))))))
       (if
         (mcall is_empty
           (name items))
@@ -330,4 +332,60 @@
           (list
             (int 1))))
       (let d
-        (str "brace { ok")))))
+        (str "brace { ok"))))
+  (enum Shape2
+    (variant Rect
+      (vfield w
+        (t Float))
+      (vfield h
+        (t Float)))
+    (variant Dot))
+  (fn t14
+    (ret
+      (t Float))
+    (block
+      (let s
+        (call
+          (name Rect)
+          (named w
+            (float 3.0))
+          (named h
+            (float 4.0))))
+      (return
+        (match
+          (name s)
+          (arm
+            (pvariant Rect
+              (pbind w)
+              (pbind h))
+            (bin *
+              (name w)
+              (name h)))
+          (arm
+            (pvariant Dot)
+            (float 0.0))))))
+  (fn pad
+    (param text
+      (t Str))
+    (param width
+      (t Int))
+    (ret
+      (t Str))
+    (block
+      (return
+        (name text))))
+  (fn t15
+    (param a
+      (t Str))
+    (ret
+      (t Str))
+    (block
+      (return
+        (interp
+          (partf ">5"
+            (call
+              (name pad)
+              (named text
+                (name a))
+              (named width
+                (int 3)))))))))
