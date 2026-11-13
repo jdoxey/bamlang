@@ -19,7 +19,7 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
    - Generate options from different angles: at least 6 sane and 4 crazy. Give each inventor a different starting lens.
    - Also consider **combinations** of options. The best candidate in ADR-0001 was a combination nobody had listed.
 3. **Real examples.**
-   - Write real, compiled, run code for the top 3 options. If our language can't run it yet, model each option in the closest existing language (for example C++ `shared_ptr` for ARC, Rust for moves, C for manual memory and handles).
+   - Write real, compiled, run code for the top 3 options. If our language can't run it yet, model each option in the closest existing language (for example Swift for ARC, Rust for moves, C for manual memory and handles).
    - Use the shared benchmark program in `docs/examples/` where it fits, so decisions can be compared.
    - Record what the code taught: line counts, bugs hit, what was awkward, what was hidden.
 4. **Review and decide.**
@@ -59,4 +59,5 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
 
 - 2026-11-13: first version, written from the ADR-0001 work.
 - 2026-11-13: added the 85% usage cap and the Debian and three-OS CI notes.
+- 2026-11-13: Swift is installed, so it is the ARC model language (issue #1). Issues are checked before each roadmap step and after every push.
 - 2026-11-13: first autonomous run (Sonnet) reached ADR 6 in two hours with no example code. Added the model split, the no-skipping rule and a CI check that blocks Accepted Full-tier ADRs without runnable examples.

@@ -7,6 +7,7 @@ You are building a programming language, about 95% autonomously. John owns it an
 1. Read `docs/STATE.md`. It says what to do next.
 2. Run `gh issue list --state open`. An open issue from John outranks everything else.
 3. Do the next item. Update `docs/STATE.md`, commit, and push to `main` after each finished step.
+4. Check open issues again before each roadmap step and after every push. When you have handled an issue from John, comment on it saying what you did, then close it.
 
 ## Binding documents (never edit these)
 

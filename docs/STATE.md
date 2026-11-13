@@ -12,7 +12,7 @@ Roadmap item **D1**, step 3 of the process: real examples.
 
 1. ~~Write `chatsim` in C from `docs/examples/chatsim/SPEC.md`. Put it in `docs/examples/chatsim/c/` with a `run.sh` that builds it and runs a script hitting every listed case. CI runs every `run.sh` on Linux, Windows and macOS, so use portable threads (Windows has no pthreads). Locally, also run it under AddressSanitizer.~~ Done 2026-11-13: `docs/examples/chatsim/c/`, green on all three OSes; clean under ASan, UBSan, LSan and TSan.
 2. ~~Write its `room` and `user` parts in three models, in the closest real language, and run the same script:
-   - **O1 pure ARC:** C++ with `shared_ptr` and `weak_ptr` for every object (Swift isn't packaged for Debian).
+   - **O1 pure ARC:** Swift (issue #1). An earlier C++ `shared_ptr` port was replaced.
    - **O4 simplified ownership:** Rust, using moves plus `Rc` only where forced.
    - **O9 owned values plus pool handles:** C with a generation-checked slot map.~~ Done: `o1-cpp/`, `o4-rust/`, `o9-c/`, green on all three OSes.
 3. ~~Record what each taught, against the cases in `docs/adr/0001-research/memory-cases.md`. Pay most attention to cases 12, 14, 20 and 25.~~ Done: `0001-research/chatsim-lessons.md`.
@@ -31,7 +31,7 @@ Then continue down `docs/ROADMAP.md`.
 
 ## Environment
 
-- This machine runs Debian 13. Installed: `build-essential`, `clang`, `rustc`, `cargo`, `jq`, `gh`. There is no `sudo` in the session; if another package is needed, list it under Blocked.
+- This machine runs Debian 13. Installed: `build-essential`, `clang` 19, `llvm-dev` 19, `lld`, `lldb`, `gdb`, `valgrind`, `cmake`, `ninja`, `go`, `swiftlang` 6.0.3, `rustc`/`cargo` 1.100, `jq`, `gh`. There is no `sudo` in the session. If a decision needs a missing tool (for example Zig or Kotlin), list it under Blocked with the exact install command and carry on with other work.
 - CI runs `ci/run.sh` on `ubuntu-24.04`, `windows-2025` and `macos-26`. Keep all three green. If a runner label stops working, look up the current one and update `ci.yml`.
 - A hook pauses the session at 85% of the account's usage. A long pause before a tool call is that hook, not a fault.
 
