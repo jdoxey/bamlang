@@ -1,0 +1,7 @@
+# expect: 4: line starts with `or`
+fn f(a: Int, b: Int) {
+  if a > 0
+      or b > 0 {
+    print(a)
+  }
+}

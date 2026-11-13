@@ -1,0 +1,4 @@
+# expect: 3: expected end of line or ';' before 'let'
+fn f() {
+  let x = 1 let y = 2
+}

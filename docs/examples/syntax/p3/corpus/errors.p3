@@ -1,0 +1,179 @@
+# errors in P1 syntax, from errors/merged/errors.txt (E1 spelling over E2 values).
+# fail KIND, MESSAGE builds the Err of the enclosing `fails` function; try has three forms.
+
+const BAD_TEXT = ("[server]\n" +
+  "port = 8080\n" +
+  "port = 9090\n" +
+  "=orphan\n" +
+  "name\n")
+const GOOD_TEXT = "# demo\n[server]\nport = 8080\n"
+const TEXTS = ["a=1\nb=2\n", "a=1\noops\n", "a=1\n", "a=1\nb=2\nc=3\n"]
+
+type Entry { section: Str, key: Str, value: Str }
+
+type Config {
+  entries: List of Entry = []
+
+  fn get(self, section: Str, key: Str) -> Optional of Str {     # absence is a value, not an error
+    for e in self.entries {
+      if e.section == section and e.key == key { return some(e.value) }
+    }
+    return none
+  }
+
+  fn len(self) -> Int { return self.entries.len() }
+}
+
+type Parser {
+  section: Str = ""
+  cfg: Config = Config()
+
+  fn parse_line(mut self, no: Int, raw: Str) fails {
+    let line = raw.trim()
+    if line.is_empty() or line.starts_with("#") { return }
+    if line.starts_with("[") and line.ends_with("]") {
+      self.section = line.inner()
+      return
+    }
+    if eq = line.find("=") {
+      let key = line.before(eq).trim()
+      if key.is_empty() { fail parse, "config.ini:{no}: empty key" }
+      if self.cfg.get(self.section, key).is_some() {
+        fail parse, "config.ini:{no}: duplicate key '{key}' in [{self.section}]"
+      }
+      self.cfg.entries.push(Entry(section: self.section, key: key, value: line.after(eq).trim()))
+    } else {
+      fail parse, "config.ini:{no}: missing '='"
+    }
+  }
+}
+
+fn parse_fail_fast(text: Str) -> Config fails {
+  var p = Parser()
+  for (i, l) in text.lines().enumerate() {
+    try p.parse_line(i + 1, l)                      # statement-level try
+  }
+  return p.cfg
+}
+
+fn parse_all(text: Str, mut report: Report) -> Config {   # cannot fail: collects instead
+  var p = Parser()
+  for (i, l) in text.lines().enumerate() {
+    report.add_if_err(p.parse_line(i + 1, l))       # consumes the Result
+  }
+  return p.cfg
+}
+
+fn parse_int(s: Str) -> Int fails {
+  if n = s.to_int() { return n }
+  fail parse, "not an integer: {s}"
+}
+
+fn part1() fails {
+  print("== part 1: config parser")
+  match parse_fail_fast(BAD_TEXT) {
+    Ok(_)  => {}
+    Err(e) => print("fail-fast: {e}")
+  }
+  var report = Report.new()
+  _ = parse_all(BAD_TEXT, report)
+  print("collect-all:")
+  for e in report.errors() { print("  {e}") }
+  print("{report.count()} errors")
+
+  let cfg = try parse_fail_fast(GOOD_TEXT)
+  if s = cfg.get("server", "port") {
+    let port = try parse_int(s) context "server.port"
+    print("server.port = {port}")
+  }
+  if s = cfg.get("server", "timeout") {
+    print("server.timeout = {s}")
+  } else {
+    print("timeout not set, using 30")
+  }
+}
+
+fn inject(fail_at: Int, step: Int) fails {
+  if fail_at == step { fail test, "injected failure" }
+}
+
+fn replace_file(dir: Path, name: Str, content: Str, fail_at: Int) fails {
+  let lock_path = "{dir}/{name}.lock"; let tmp = "{dir}/{name}.tmp"; let dst = "{dir}/{name}"
+  let txn = Txn.new(fn() { remove(tmp) })          # undo unless commit; cannot fail
+  let held = try Lock.create(lock_path) context "step 1: create lock"
+  txn.on_undo(fn() => held.abandon())
+  try inject(fail_at, 1) context "step 1: create lock"
+
+  let f = try File.create(tmp) context "step 2: write temp"
+  try f.write(content) context "step 2: write temp"
+  try f.close() context "step 2: write temp"      # explicit fallible cleanup
+  try inject(fail_at, 2) context "step 2: write temp"
+
+  try inject(fail_at, 3) context "step 3: rename temp"
+  try rename(tmp, dst) context "step 3: rename temp"
+
+  try inject(fail_at, 4) context "step 4: remove lock"
+  try held.close() context "step 4: remove lock"   # consuming close
+  txn.commit()                                       # success: undo does not run
+}
+
+fn part2() fails {
+  print("== part 2: replace_file")
+  let dir = try TempDir.create("errors") context "make temp dir"
+  try write(dir / "data.txt", "old") context "seed data.txt"
+  let labels = ["no failure", "fail at step 1", "fail at step 2", "fail at step 3", "fail at step 4"]
+  for run in 0..5 {
+    let res = match replace_file(dir, "data.txt", "v{run + 1}", run) {
+      Ok(_)  => "ok"
+      Err(e) => "error: {e}"
+    }
+    print("run {run + 1}, {labels[run]}: {res}")
+    let files = try dir.list().sorted().join(" ") context "list dir"
+    let content = try read(dir / "data.txt") context "read data.txt"
+    print("  files: {files}")
+    print("  content: {content}")
+  }
+}
+
+fn worker(n: Int, text: Str) -> Int fails {
+  let cfg = try parse_fail_fast(text) context "worker {n}"
+  return cfg.len()
+}
+
+fn worker3(text: Str, m: Mutex of Int, mut tally: Int) -> Int fails {
+  let cfg = try parse_fail_fast(text) context "worker 3"
+  lock m {                                           # released by unwinding; mutex poisoned
+    tally += 10
+    let keys = cfg.keys()
+    print(keys[keys.len() + 5])                      # a trap: index out of range
+  }
+  return cfg.len()
+}
+
+fn part3() fails {
+  print("== part 3: crew")
+  let m = Mutex(0)
+  var tally = 100
+  _ = try crew c {                                   # converts a CHILD's trap to Error{kind: trap} at the brace
+    c.go(fn() => worker(1, TEXTS[0]))
+    c.go(fn() => worker(2, TEXTS[1]))
+    c.go(fn() => worker3(TEXTS[2], m, tally))
+    c.go(fn() => worker(4, TEXTS[3]))
+  } or e {
+    print("error: {e}")                              # error: worker 2: config.ini:2: missing '=' (plus 1 more)
+    Unit
+  }
+  print("mutex poisoned: {if m.is_poisoned() { "yes" } else { "no" }}")
+  expect_trap(fn() {
+    let scratch = Mutex(0)
+    var t = 0
+    worker3(TEXTS[2], scratch, t)
+  })
+  print("expect_trap ok")
+}
+
+fn main() fails {
+  try part1()
+  try part2()
+  try part3()
+}

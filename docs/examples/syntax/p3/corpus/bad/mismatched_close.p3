@@ -1,0 +1,4 @@
+# expect: 3: mismatched '}'
+fn f() {
+  print(1, 2}
+}

@@ -1,0 +1,7 @@
+# expect: 3: expected '{' to open the if body
+fn f(x: Int) {
+  if x > 0
+  {
+    print("pos")
+  }
+}
