@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs the P1 parser over the corpus; compares with ../expected/*.ast; checks every bad file's error.
+# Runs the P3 parser over the corpus; compares with expected/*.ast; checks every bad file's error.
 PY=$(command -v python3 || command -v python)
 cd "$(dirname "$0")" || exit 1
 fail=0
@@ -7,8 +7,8 @@ tmp=$(mktemp -d 2>/dev/null || echo "${TMPDIR:-/tmp}/p3run.$$"); mkdir -p "$tmp"
 for n in chatsim widgets errors types tricky; do
   if ! "$PY" parser.py "corpus/$n.p3" 2>"$tmp/err" | tr -d '\r' > "$tmp/$n.out"; then :; fi
   if [ -s "$tmp/err" ]; then echo "FAIL $n: $(cat "$tmp/err")"; fail=1; continue; fi
-  if tr -d '\r' < "../expected/$n.ast" | diff - "$tmp/$n.out" > "$tmp/diff"; then :; else
-    echo "FAIL $n: AST differs from ../expected/$n.ast"; head -20 "$tmp/diff"; fail=1
+  if tr -d '\r' < "expected/$n.ast" | diff - "$tmp/$n.out" > "$tmp/diff"; then :; else
+    echo "FAIL $n: AST differs from expected/$n.ast"; head -20 "$tmp/diff"; fail=1
   fi
 done
 # CRLF: the lexer must give the same AST for CRLF line ends (and a lone CR)

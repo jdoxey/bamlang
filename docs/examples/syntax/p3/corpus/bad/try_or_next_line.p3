@@ -1,5 +1,0 @@
-# expect: 4: line starts with `or`: wrap the whole expression in ( ) (for try
-fn f() fails {
-  let b = try g()
-    or e { }
-}

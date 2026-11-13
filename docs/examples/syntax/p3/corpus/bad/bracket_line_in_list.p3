@@ -1,0 +1,5 @@
+# expect: 4: line starts with `[` after a complete item
+fn f(a: List of Int) {
+  let xs = foo(a
+    [0])
+}

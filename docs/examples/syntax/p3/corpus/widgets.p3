@@ -310,7 +310,7 @@ fn main() {
     match t[0] {
       "window" => cmd_window(t[1])
       "add"    => cmd_add(t[1], t[2], t[3], t.get(4))
-      "on"     => { try cmd_on(t[1], t[2], t.get(3)) or e { error("{e}") } }
+      "on"     => { try cmd_on(t[1], t[2], t.get(3)) else e { error("{e}") } }
       "click"  => cmd_click(t[1])
       "remove" => cmd_remove(t[1])
       "tree"   => cmd_tree()

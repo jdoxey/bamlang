@@ -2,21 +2,21 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D6, core syntax (statement endings without semicolons or indentation, blocks, declarations, naming) and the example corpus that becomes the syntax tests.
-- **Decided:** ADR-0001 memory, ADR-0002 containers, ADR-0003 concurrency (crews), ADR-0004 errors (`fails`/`try`, no null), ADR-0005 types (methods, `iface` + `dyn`, no inheritance). Veto by opening an issue.
+- **Now:** D7, the DSL and declarative layout mechanism (G11) without macros or annotations.
+- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (newline-terminated, braces, `Name(field: v)`; parser and corpus in `docs/examples/syntax/p3/`). Veto by opening an issue.
 - **Needs you:** nothing. Issue #3 answered (yes); your mitigations are in ADR-0002.
 
 ## Next action
 
-Roadmap item **D6** (ADR-0006, Full). Inputs:
-- G4 (clean, non-verbose) and G5 (no significant whitespace, no mandatory semicolons).
-- Every ADR's "Syntax budget impact" section lists keywords and grammar to spell: `of`, `take`, `with`, `lock`, `crew`, `fails`, `try … or e`, `context`, `iface`, `impl`, `dyn`, `pub`, `is`, `match`, `enum`, receiver modes, field lists `.dept desc`, `if x = …`, named arguments with defaults (ADR-0005).
-- The pseudo-syntax files written so far are the raw material: `docs/examples/widgets/o9s.txt`, `generics/aplus/aplus.txt`, `threads/f1-crew/crew.txt`, `errors/merged/errors.txt`, `types/t3plus/types.txt`.
+Roadmap item **D7** (ADR-0007, Full). Inputs:
+- G11 and Q15: is G11 syntax only, or a UI framework in v1? Earlier ADRs assumed syntax only for v1. Decide.
+- ADR-0006 left trailing closures open (they collide with `if f(x) {`); its review's UI sample (nested `Name(children: [...])`) had a `]), ])` staircase.
+- ADR-0005: `pub` fields with defaults, named arguments, `iface` + `dyn`, the Widget enum with `Ext`. ADR-0001's DSL constraint: state is framework-owned and addressed by handles; callbacks capture handles.
 
-1. Step 1: research how Go, Kotlin, Swift, Scala 3, Lua, Ruby, JavaScript (ASI) and Odin end statements without semicolons and without indentation, and what went wrong (ASI hazards, line continuation).
-2. Step 2: criteria first, then 6 sane and 4 crazy syntax options, plus combinations.
-3. Step 3: write the same corpus (at least chatsim, widgets and errors) in the top 3 syntaxes. Build a real parser for each finalist (for example a small recursive-descent parser in Python or Rust in `docs/examples/syntax/<option>/`) that parses the whole corpus in CI on three OSes. This is the "real code" for a syntax decision.
-4. Step 4: an Opus reviewer attacks the winner; scores by script; decide; ADR under 300 lines. The winning corpus becomes `tests/corpus/` for M0.
+1. Step 1: research (SwiftUI result builders, Kotlin type-safe builders and Compose, Flutter, Elm/HTML DSLs, QML, Jetpack, Gradle Kotlin DSL, Ruby blocks, Lua tables), with what went wrong (G3: annotations and macros).
+2. Step 2: criteria first, then 6 sane and 4 crazy ideas, plus combinations.
+3. Step 3: extend the P3 parser (copy it to `docs/examples/dsl/<option>/`) for each finalist's DSL form, and write a UI layout, a build file and an HTML or test DSL in each. Parse them in CI, and run one end to end through a small interpreter or C model if the option needs runtime support.
+4. Step 4: an Opus reviewer attacks the winner; scores by script; decide; ADR under 300 lines.
 
 ## Open questions carried forward
 
@@ -38,6 +38,7 @@ Nothing.
 
 - 2026-11-13: repo set up from the planning conversation.
 - 2026-11-13: first run on Sonnet skipped the real-examples step. John reset `main`; that work is on the `sonnet-attempt` branch for reference only.
+- 2026-11-13: ADR-0006 Accepted (P3 after review; three real parsers checked against one shared AST).
 - 2026-11-13: ADR-0005 Accepted (T3+ after review and a loop-2 example).
 - 2026-11-13: ADR-0004 Accepted (merged E1 spelling over E2 values after one review loop). Issue #3 answered yes by John and closed.
 - 2026-11-13: ADR-0003 Accepted (a tie broken by the examples and reversibility after one review loop).

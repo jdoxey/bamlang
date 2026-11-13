@@ -76,12 +76,12 @@ fn t7(items: List of Int, c: Crew) {
   }
 }
 
-# 8. try handlers: `or e {` stays on the line of the try operand (a leading `or` on the next line is an error)
+# 8. try handlers: `else e {` stays on the line of the try operand (`else` on the next line is an error)
 fn t8() fails {
-  let a = try f(1) or e {
+  let a = try f(1) else e {
     return
   }
-  let b = try f(2) or _ { }
+  let b = try f(2) else _ { }
   try g() context "ctx"
 }
 
@@ -99,12 +99,58 @@ fn t9(rows: List of Row) {
   rows.sort_by(.dept desc, .a.b)
 }
 
-# 10. multi-line declarations; a < b > (c) is two comparisons, never a generic
+# 10. multi-line declarations; (a < b) > (c) is two comparisons, never a generic; `a < b > c` is an error (see bad/)
 fn t10(
   a: Int,
   b: Int,
   c: Int = 3,
 ) -> Int {
-  let g = a < b > (c)
+  let g = (a < b) > (c)
   return g
+}
+
+# 11. contextual words are ordinary names: after `.` any word is a member; a word before `:` is a name
+type Tok {
+  type: Text,
+  to: Int,
+}
+enum Ev {
+  Msg(type: Text, to: Int),
+  Quit,
+}
+fn t11(tok: Tok, xs: List of Int, context: Ctx) {
+  let t = tok.type
+  let h = xs.take(3)
+  send(to: a)
+  send(type: 1)
+  let lock = 1
+  let with = lock
+  let desc = 2
+  let of = desc
+  let to = of + with
+  tok.fn
+}
+fn t11b(context: Ctx, take: Int, mut self) {}
+
+# 12. a trailing , before the newline is fine in { } item bodies
+enum Color {
+  Red,
+  Green,
+}
+fn t12(c: Color) -> Int {
+  return match c {
+    Red => 1,
+    Green => 2,
+  }
+}
+
+# 13. a leading . continues after ), ], a name, a literal or self; `to` heads
+fn t13(m: Map of List of Int to Bool, l: Lru of Text to Int, s: SortedMap of Int to Int) {
+  let a = self
+    .x
+  let b = "abc"
+    .len()
+  let c = [1]
+    .len()
+  let d = "brace \{ ok"
 }

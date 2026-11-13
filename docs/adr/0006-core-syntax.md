@@ -1,6 +1,6 @@
 # ADR-0006: Core syntax
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-13
 - **Tier:** Full (see `docs/PROCESS.md`)
 - **Examples:** `docs/examples/syntax` (P3 in `p3/`; rivals in `p1/`, `p2/`; the shared AST format is in `AST.md`)
@@ -75,7 +75,7 @@ See `0006-research/lessons-and-scores.md` and `review-p3.md`.
 - **P3** needed parentheses on 2 real lines in 1153, and turns P1's silent join into an error at the right line.
 - **The reviewer** verified that P3's corpus parses to the same ASTs under P1. So P3 is a strict subset of P1 with the
   same meaning, and relaxing it later can't break a program.
-- **The loop-2 parser** applies the review's fixes. See `p3/NOTES.md`.
+- **The loop-2 parser** (1004 lines) applies the review's fixes and adds 24 new error tests (33 in total). Common words parse as names (`tok.type`, `xs.take(3)`, `send(to: a)`, `let lock = 1`). The one AST change: a statement in a match arm needs `{ }` (F12).
 
 ## Decision
 
@@ -110,7 +110,7 @@ See `0006-research/lessons-and-scores.md` and `review-p3.md`.
 12. **Operators and checks.** Use `and`/`or`/`not`, never symbols, and comparisons don't chain. `#` starts a comment.
     Unreachable statements and unused non-call values are errors (a semantic check in M2).
 
-**Keywords.** About 26 are truly reserved; see `p3/NOTES.md`. These are contextual and usable as names elsewhere:
+**Keywords.** 28 words are truly reserved: `pub const type enum iface impl for fn let var if else while in match return fail break continue try or and not mut self true false none`. These are contextual and usable as names elsewhere:
 `desc asc to of context crew lock with drop take is dyn fails module use as`. After `.`, any word is a member name.
 
 **Tooling.**
@@ -155,7 +155,7 @@ because P3 is a meaning-preserving subset of P1, so it is the reversible choice.
 
 | Item | Count |
 |---|---|
-| Reserved keywords | about 26 |
+| Reserved keywords | 28 |
 | Contextual words | 16 |
 | Operators | arithmetic, comparison, `?.`, `=>`, `->`, `..` (no symbol booleans) |
 

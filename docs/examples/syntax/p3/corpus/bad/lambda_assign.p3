@@ -1,0 +1,4 @@
+# expect: 3: `=>` takes an expression; use `{ }` for statements
+fn f(c: Crew, n: Int) {
+  c.go(fn() => n = 1)
+}

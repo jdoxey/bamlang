@@ -1,4 +1,4 @@
-# expect: 3: expected ')' or ',' in the argument list
+# expect: 3: a `,` is probably missing
 fn f(a: Int, b: Int) {
   g(a b)
 }

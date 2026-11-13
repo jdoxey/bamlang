@@ -137,7 +137,7 @@ module core {
     pub fn deposit(mut self, m: Money) { self.balance = self.balance.plus(m) }
     pub fn withdraw(mut self, m: Money) fails {
       match self.balance.minus(m) {
-        some(b) => self.balance = b
+        some(b) => { self.balance = b }
         none    => fail "insufficient funds: balance {self.balance.cents()}, need {m.cents()}"
       }
     }

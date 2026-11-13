@@ -1,0 +1,733 @@
+(file
+  (const BAD_TEXT
+    (bin +
+      (bin +
+        (bin +
+          (bin +
+            (str "[server]\n")
+            (str "port = 8080\n"))
+          (str "port = 9090\n"))
+        (str "=orphan\n"))
+      (str "name\n")))
+  (const GOOD_TEXT
+    (str "# demo\n[server]\nport = 8080\n"))
+  (const TEXTS
+    (list
+      (str "a=1\nb=2\n")
+      (str "a=1\noops\n")
+      (str "a=1\n")
+      (str "a=1\nb=2\nc=3\n")))
+  (type Entry
+    (field section
+      (t Str))
+    (field key
+      (t Str))
+    (field value
+      (t Str)))
+  (type Config
+    (field entries
+      (t List
+        (t Entry))
+      (default
+        (list)))
+    (fn get
+      (recv self)
+      (param section
+        (t Str))
+      (param key
+        (t Str))
+      (ret
+        (t Optional
+          (t Str)))
+      (block
+        (for
+          (pbind e)
+          (field entries
+            (name self))
+          (block
+            (if
+              (bin and
+                (bin ==
+                  (field section
+                    (name e))
+                  (name section))
+                (bin ==
+                  (field key
+                    (name e))
+                  (name key)))
+              (block
+                (return
+                  (call
+                    (name some)
+                    (field value
+                      (name e))))))))
+        (return
+          (none))))
+    (fn len
+      (recv self)
+      (ret
+        (t Int))
+      (block
+        (return
+          (mcall len
+            (field entries
+              (name self)))))))
+  (type Parser
+    (field section
+      (t Str)
+      (default
+        (str "")))
+    (field cfg
+      (t Config)
+      (default
+        (call
+          (name Config))))
+    (fn parse_line fails
+      (recv mut)
+      (param no
+        (t Int))
+      (param raw
+        (t Str))
+      (block
+        (let line
+          (mcall trim
+            (name raw)))
+        (if
+          (bin or
+            (mcall is_empty
+              (name line))
+            (mcall starts_with
+              (name line)
+              (str "#")))
+          (block
+            (return)))
+        (if
+          (bin and
+            (mcall starts_with
+              (name line)
+              (str "["))
+            (mcall ends_with
+              (name line)
+              (str "]")))
+          (block
+            (assign
+              (field section
+                (name self))
+              (mcall inner
+                (name line)))
+            (return)))
+        (iflet eq
+          (mcall find
+            (name line)
+            (str "="))
+          (block
+            (let key
+              (mcall trim
+                (mcall before
+                  (name line)
+                  (name eq))))
+            (if
+              (mcall is_empty
+                (name key))
+              (block
+                (fail
+                  (name parse)
+                  (interp
+                    (s "config.ini:")
+                    (part
+                      (name no))
+                    (s ": empty key")))))
+            (if
+              (mcall is_some
+                (mcall get
+                  (field cfg
+                    (name self))
+                  (field section
+                    (name self))
+                  (name key)))
+              (block
+                (fail
+                  (name parse)
+                  (interp
+                    (s "config.ini:")
+                    (part
+                      (name no))
+                    (s ": duplicate key '")
+                    (part
+                      (name key))
+                    (s "' in [")
+                    (part
+                      (field section
+                        (name self)))
+                    (s "]")))))
+            (mcall push
+              (field entries
+                (field cfg
+                  (name self)))
+              (call
+                (name Entry)
+                (named section
+                  (field section
+                    (name self)))
+                (named key
+                  (name key))
+                (named value
+                  (mcall trim
+                    (mcall after
+                      (name line)
+                      (name eq)))))))
+          (else
+            (block
+              (fail
+                (name parse)
+                (interp
+                  (s "config.ini:")
+                  (part
+                    (name no))
+                  (s ": missing '='")))))))))
+  (fn parse_fail_fast fails
+    (param text
+      (t Str))
+    (ret
+      (t Config))
+    (block
+      (var p
+        (call
+          (name Parser)))
+      (for
+        (ptuple
+          (pbind i)
+          (pbind l))
+        (mcall enumerate
+          (mcall lines
+            (name text)))
+        (block
+          (try
+            (mcall parse_line
+              (name p)
+              (bin +
+                (name i)
+                (int 1))
+              (name l)))))
+      (return
+        (field cfg
+          (name p)))))
+  (fn parse_all
+    (param text
+      (t Str))
+    (param report mut
+      (t Report))
+    (ret
+      (t Config))
+    (block
+      (var p
+        (call
+          (name Parser)))
+      (for
+        (ptuple
+          (pbind i)
+          (pbind l))
+        (mcall enumerate
+          (mcall lines
+            (name text)))
+        (block
+          (mcall add_if_err
+            (name report)
+            (mcall parse_line
+              (name p)
+              (bin +
+                (name i)
+                (int 1))
+              (name l)))))
+      (return
+        (field cfg
+          (name p)))))
+  (fn parse_int fails
+    (param s
+      (t Str))
+    (ret
+      (t Int))
+    (block
+      (iflet n
+        (mcall to_int
+          (name s))
+        (block
+          (return
+            (name n))))
+      (fail
+        (name parse)
+        (interp
+          (s "not an integer: ")
+          (part
+            (name s))))))
+  (fn part1 fails
+    (block
+      (call
+        (name print)
+        (str "== part 1: config parser"))
+      (match
+        (call
+          (name parse_fail_fast)
+          (name BAD_TEXT))
+        (arm
+          (pvariant Ok
+            (pwild))
+          (block))
+        (arm
+          (pvariant Err
+            (pbind e))
+          (call
+            (name print)
+            (interp
+              (s "fail-fast: ")
+              (part
+                (name e))))))
+      (var report
+        (mcall new
+          (name Report)))
+      (assign
+        (name _)
+        (call
+          (name parse_all)
+          (name BAD_TEXT)
+          (name report)))
+      (call
+        (name print)
+        (str "collect-all:"))
+      (for
+        (pbind e)
+        (mcall errors
+          (name report))
+        (block
+          (call
+            (name print)
+            (interp
+              (s "  ")
+              (part
+                (name e))))))
+      (call
+        (name print)
+        (interp
+          (part
+            (mcall count
+              (name report)))
+          (s " errors")))
+      (let cfg
+        (try
+          (call
+            (name parse_fail_fast)
+            (name GOOD_TEXT))))
+      (iflet s
+        (mcall get
+          (name cfg)
+          (str "server")
+          (str "port"))
+        (block
+          (let port
+            (try-context
+              (call
+                (name parse_int)
+                (name s))
+              (str "server.port")))
+          (call
+            (name print)
+            (interp
+              (s "server.port = ")
+              (part
+                (name port))))))
+      (iflet s
+        (mcall get
+          (name cfg)
+          (str "server")
+          (str "timeout"))
+        (block
+          (call
+            (name print)
+            (interp
+              (s "server.timeout = ")
+              (part
+                (name s)))))
+        (else
+          (block
+            (call
+              (name print)
+              (str "timeout not set, using 30")))))))
+  (fn inject fails
+    (param fail_at
+      (t Int))
+    (param step
+      (t Int))
+    (block
+      (if
+        (bin ==
+          (name fail_at)
+          (name step))
+        (block
+          (fail
+            (name test)
+            (str "injected failure"))))))
+  (fn replace_file fails
+    (param dir
+      (t Path))
+    (param name
+      (t Str))
+    (param content
+      (t Str))
+    (param fail_at
+      (t Int))
+    (block
+      (let lock_path
+        (interp
+          (part
+            (name dir))
+          (s "/")
+          (part
+            (name name))
+          (s ".lock")))
+      (let tmp
+        (interp
+          (part
+            (name dir))
+          (s "/")
+          (part
+            (name name))
+          (s ".tmp")))
+      (let dst
+        (interp
+          (part
+            (name dir))
+          (s "/")
+          (part
+            (name name))))
+      (let txn
+        (mcall new
+          (name Txn)
+          (lambda
+            (block
+              (call
+                (name remove)
+                (name tmp))))))
+      (let held
+        (try-context
+          (mcall create
+            (name Lock)
+            (name lock_path))
+          (str "step 1: create lock")))
+      (mcall on_undo
+        (name txn)
+        (lambda
+          (mcall abandon
+            (name held))))
+      (try-context
+        (call
+          (name inject)
+          (name fail_at)
+          (int 1))
+        (str "step 1: create lock"))
+      (let f
+        (try-context
+          (mcall create
+            (name File)
+            (name tmp))
+          (str "step 2: write temp")))
+      (try-context
+        (mcall write
+          (name f)
+          (name content))
+        (str "step 2: write temp"))
+      (try-context
+        (mcall close
+          (name f))
+        (str "step 2: write temp"))
+      (try-context
+        (call
+          (name inject)
+          (name fail_at)
+          (int 2))
+        (str "step 2: write temp"))
+      (try-context
+        (call
+          (name inject)
+          (name fail_at)
+          (int 3))
+        (str "step 3: rename temp"))
+      (try-context
+        (call
+          (name rename)
+          (name tmp)
+          (name dst))
+        (str "step 3: rename temp"))
+      (try-context
+        (call
+          (name inject)
+          (name fail_at)
+          (int 4))
+        (str "step 4: remove lock"))
+      (try-context
+        (mcall close
+          (name held))
+        (str "step 4: remove lock"))
+      (mcall commit
+        (name txn))))
+  (fn part2 fails
+    (block
+      (call
+        (name print)
+        (str "== part 2: replace_file"))
+      (let dir
+        (try-context
+          (mcall create
+            (name TempDir)
+            (str "errors"))
+          (str "make temp dir")))
+      (try-context
+        (call
+          (name write)
+          (bin /
+            (name dir)
+            (str "data.txt"))
+          (str "old"))
+        (str "seed data.txt"))
+      (let labels
+        (list
+          (str "no failure")
+          (str "fail at step 1")
+          (str "fail at step 2")
+          (str "fail at step 3")
+          (str "fail at step 4")))
+      (for
+        (pbind run)
+        (bin ..
+          (int 0)
+          (int 5))
+        (block
+          (let res
+            (match
+              (call
+                (name replace_file)
+                (name dir)
+                (str "data.txt")
+                (interp
+                  (s "v")
+                  (part
+                    (bin +
+                      (name run)
+                      (int 1))))
+                (name run))
+              (arm
+                (pvariant Ok
+                  (pwild))
+                (str "ok"))
+              (arm
+                (pvariant Err
+                  (pbind e))
+                (interp
+                  (s "error: ")
+                  (part
+                    (name e))))))
+          (call
+            (name print)
+            (interp
+              (s "run ")
+              (part
+                (bin +
+                  (name run)
+                  (int 1)))
+              (s ", ")
+              (part
+                (index
+                  (name labels)
+                  (name run)))
+              (s ": ")
+              (part
+                (name res))))
+          (let files
+            (try-context
+              (mcall join
+                (mcall sorted
+                  (mcall list
+                    (name dir)))
+                (str " "))
+              (str "list dir")))
+          (let content
+            (try-context
+              (call
+                (name read)
+                (bin /
+                  (name dir)
+                  (str "data.txt")))
+              (str "read data.txt")))
+          (call
+            (name print)
+            (interp
+              (s "  files: ")
+              (part
+                (name files))))
+          (call
+            (name print)
+            (interp
+              (s "  content: ")
+              (part
+                (name content))))))))
+  (fn worker fails
+    (param n
+      (t Int))
+    (param text
+      (t Str))
+    (ret
+      (t Int))
+    (block
+      (let cfg
+        (try-context
+          (call
+            (name parse_fail_fast)
+            (name text))
+          (interp
+            (s "worker ")
+            (part
+              (name n)))))
+      (return
+        (mcall len
+          (name cfg)))))
+  (fn worker3 fails
+    (param text
+      (t Str))
+    (param m
+      (t Mutex
+        (t Int)))
+    (param tally mut
+      (t Int))
+    (ret
+      (t Int))
+    (block
+      (let cfg
+        (try-context
+          (call
+            (name parse_fail_fast)
+            (name text))
+          (str "worker 3")))
+      (lock
+        (name m)
+        (block
+          (opassign +
+            (name tally)
+            (int 10))
+          (let keys
+            (mcall keys
+              (name cfg)))
+          (call
+            (name print)
+            (index
+              (name keys)
+              (bin +
+                (mcall len
+                  (name keys))
+                (int 5))))))
+      (return
+        (mcall len
+          (name cfg)))))
+  (fn part3 fails
+    (block
+      (call
+        (name print)
+        (str "== part 3: crew"))
+      (let m
+        (call
+          (name Mutex)
+          (int 0)))
+      (var tally
+        (int 100))
+      (assign
+        (name _)
+        (try-or e
+          (crew c
+            (block
+              (mcall go
+                (name c)
+                (lambda
+                  (call
+                    (name worker)
+                    (int 1)
+                    (index
+                      (name TEXTS)
+                      (int 0)))))
+              (mcall go
+                (name c)
+                (lambda
+                  (call
+                    (name worker)
+                    (int 2)
+                    (index
+                      (name TEXTS)
+                      (int 1)))))
+              (mcall go
+                (name c)
+                (lambda
+                  (call
+                    (name worker3)
+                    (index
+                      (name TEXTS)
+                      (int 2))
+                    (name m)
+                    (name tally))))
+              (mcall go
+                (name c)
+                (lambda
+                  (call
+                    (name worker)
+                    (int 4)
+                    (index
+                      (name TEXTS)
+                      (int 3)))))))
+          (block
+            (call
+              (name print)
+              (interp
+                (s "error: ")
+                (part
+                  (name e))))
+            (name Unit))))
+      (call
+        (name print)
+        (interp
+          (s "mutex poisoned: ")
+          (part
+            (if
+              (mcall is_poisoned
+                (name m))
+              (block
+                (str "yes"))
+              (else
+                (block
+                  (str "no")))))))
+      (call
+        (name expect_trap)
+        (lambda
+          (block
+            (let scratch
+              (call
+                (name Mutex)
+                (int 0)))
+            (var t
+              (int 0))
+            (call
+              (name worker3)
+              (index
+                (name TEXTS)
+                (int 2))
+              (name scratch)
+              (name t)))))
+      (call
+        (name print)
+        (str "expect_trap ok"))))
+  (fn main fails
+    (block
+      (try
+        (call
+          (name part1)))
+      (try
+        (call
+          (name part2)))
+      (try
+        (call
+          (name part3))))))

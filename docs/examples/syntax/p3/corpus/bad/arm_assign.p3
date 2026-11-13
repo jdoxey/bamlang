@@ -1,0 +1,7 @@
+# expect: 4: `=>` takes an expression; use `{ }` for statements
+fn f(x: Int, y: Int) {
+  match x {
+    1 => y = 2
+    _ => print(x)
+  }
+}

@@ -299,7 +299,7 @@ fn main() fails {
       srv.handle(line)
     }
     jobs.close()
-  } or e {
+  } else e {
     print("fatal: {e}")
   }
   print("exit: alive users={srv.users.len()} rooms={srv.rooms.len()}")

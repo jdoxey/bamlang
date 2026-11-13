@@ -1,27 +1,32 @@
-# P3 (S3: brackets continue, nothing else) notes
-**Parser diff vs P1.** `parser.py` 896 lines (P1 872): 30 lines added, 6 removed, all in `Lexer.newline`/`continues`
-(+ a `BINOPS` tuple, +1 `dangling`). Parser proper untouched. Rule: a newline is dropped inside `( )`/`[ ]` (as P1) or
-when the next line starts with `.`/`?.`; otherwise it ends the statement. Outside brackets, a last token that is a
-binary op, `=`/`+=`.., `,`, `and`, `or` is an error; so is a next line starting with `and`/`or`. A `{` inside
-brackets (lambda body) turns ends back on, as in P1. Grouping parens leave no node in either parser (AST.md), so
-`expected/*.ast` is reproduced byte for byte; `sh run.sh` passes (5 ASTs, CRLF variants, 18 bad files).
-**Corpus vs P1 lines.** chatsim 306/306, widgets 321/321, errors 179/179, types 236/236, tricky 110/111 (two snippets
-merged to one line). Lines changed: chatsim 2, errors 2, tricky 14 (comments included), widgets 0, types 0.
-**Places parens had to be added: 6 (4 in tricky, 1 in chatsim, 1 in errors); 2 of them in real programs.** Reads:
-- `while (self.timers.len() > 0` / `and self.timers[0].due <= self.clock) {` (chatsim; condition-in-parens, `{` after `)`)
-- `const BAD_TEXT = ("[server]\n" +` ... `"name\n")` (errors; a 5-line string concatenation)
-- tricky: `let d = (a -`/`b)`, `let s = (a +`/`b *`/`2)`, `if (a > 0`/`and b > 0`/`or c > 0) {`, `return (a > 0 and`/`b > 0)`.
-Everything else in the real programs (argument lists, list literals, `.method()` chains, params) already sat inside
-brackets or used leading dots. Cost is low; the trailing `{` after `)` reads fine; a one-line `try ... or e {` is forced.
-**Tricky snippets (same ten).** 1 `return` newline `x`: bare return then `x` (unchanged). 2 line starting `(`/`[`
-is a new statement (unchanged). 3 `-c` new statement; `a -` newline `b` is now an ERROR outside parens, so the corpus
-wraps it; `a -b` binary (unchanged). 4 leading `.`/`?.` across blank/comment lines (unchanged). 5 trailing op
-continues only inside `( )`; trailing comma/opener only inside brackets. 6 leading and/or are whitespace inside parens,
-an error outside. 7 braces on the header line (unchanged). 8 `try f(2)` newline `or _ {}` is now an error
-(bad/try_or_next_line); the handler must share the line. 9, 10 unchanged (all bracketed).
-Residual hazard kept from P1: inside `( )` a line starting `(`/`[` joins as a call/index (`(f` newline `(1))` is a call).
-**Errors vs P1.** P1's weak case is fixed: `let x = 1 +` then `}` or then `b` both report at the operator, line of
-the operator: "line ends with `+`: wrap the whole expression in ( ) (only brackets and a leading '.' continue a line)".
-Leading `and`/`or` and trailing `,`/`and`/`=` give the same shape of message at the right line and column; the `or`
-variant adds the `try ... or e {` hint. All other P1 messages are identical. New cost: a forgotten `)` is still found
-only at EOF (as P1), but now a missed continuation never silently changes meaning.
+# P3 (S3: brackets continue, nothing else) notes, loop 2 (review fixes F1-F12)
+Rule kept: a newline is dropped inside `( )`/`[ ]` or when the next line starts with `.`/`?.`; otherwise it ends the
+statement. `sh run.sh` prints "p3 syntax corpus OK" (5 ASTs, CRLF variants, 33 bad files). p1/run.sh, p2/run.sh pass.
+`parser.py` is 1004 lines (was 896). P3 now has its own `expected/` (copied from ../expected); only types.ast and
+tricky.ast differ from the shared files.
+**What changed**
+- F1: in `( )`/`[ ]` a line starting `(`, `[` or `-` after a complete item is an error ("add `,`").
+- F2: handler is `try f() else e { }`. Operand is one postfix chain; `try g() == 3` is `(try g()) == 3`. The
+  try-or-next-line special case is gone (a next-line `else` is the generic else error). Same AST node `try-or`.
+- F3: word after `.`/`?.` is a member (lexer makes it an id); any word before `:` is a name in args, params, fields,
+  variant fields. Contextual (plain ids, parser gives meaning by position): desc asc to of context crew lock with
+  drop take is dyn fails module use as. Truly reserved (28): pub const type enum iface impl for fn let var if else
+  while in match return fail break continue try or and not mut self true false none.
+- F4: trailing `,` before a newline in `{ }` is accepted (lexer emits the newline); in a block it stays an error.
+- F5: type/enum/iface/variant names must be capitalised (error at the declaration); lowercase patterns bind.
+- F6: comparisons are non-associative. F7: `to` only after Map, SortedMap, Lru (nested `Map of List of Int to B` ok).
+- F8: a leading `.` continues only after `)`, `]`, a name, a literal or `self`. F9: later semantic check (noted).
+- F10: a line ending in `: . ?. not -> => of to`, a binary op, `=`, `,` outside brackets is an error.
+- F11: error path only. When a `{`/`(` is unclosed or mismatched, the innermost opener whose body dedents to or below
+  its own indentation is named: "unclosed `{` from line N (the line after it dedents at line M)". Parsing never reads
+  indentation.
+- F12: `=>` with an assignment (arm or lambda) errors; missing `,` in list/args says so; `{` in a string says `\{`.
+**Corpus edits.** `or e {` became `else e {` (chatsim, errors, widgets, tricky; AST unchanged). tricky `a < b > (c)`
+became `(a < b) > (c)` (same AST). types.p3: `some(b) => self.balance = b` is now `=> { self.balance = b }`, so
+p3/expected/types.ast has a `(block ...)` around that assign. tricky gained t11-t13 (tok.type, xs.take(3),
+send(to: a), let lock = 1, fn f(context: Ctx), trailing commas, leading dots, Lru, `\{`); tricky.ast regenerated.
+**New bad tests (line: message part).** paren_line_in_args 4 `(`; minus_line_in_list 5 `-`; bracket_line_in_list 4 `[`;
+try_else_next_line 4 else; try_or_handler 3 old `or e {`; reserved_as_name 3; lowercase_type/iface 2,
+lowercase_variant 3; chained_compare, chained_equal 3; to_after_list 2; dot_after_brace 5; ends_with_colon/dot/not 3,
+ends_with_arrow 2, ends_with_fat_arrow 4, ends_with_of 3; unclosed_inner_brace 4; unclosed_paren_hint 3;
+mismatched_same_line 2; arm_assign 4; lambda_assign 3; list_missing_comma 2; string_open_brace 3.
+Updated: call_with_missing_comma (new text), mismatched_close (now the hint), try_or_next_line renamed.

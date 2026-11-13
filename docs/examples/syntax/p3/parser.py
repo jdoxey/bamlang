@@ -3,16 +3,20 @@
 Usage: parser.py FILE   (prints the AST described in ../AST.md, or exits 1 with FILE:LINE:COL: message)"""
 import sys, json
 
-KW = set("""module use pub const type enum iface impl for fn drop let var if else while in match return fail fails
-break continue try context or and not crew lock with of to dyn is take mut self true false none desc as""".split())
-ENDER_KW = {'return', 'break', 'continue', 'true', 'false', 'none', 'self', 'fails', 'desc'}
+# Truly reserved (28). Contextual words (desc asc to of context crew lock with drop take is dyn fails module use as)
+# are plain names lexed as ids; the parser gives them meaning only where the grammar expects them.
+KW = set("""pub const type enum iface impl for fn let var if else while in match return fail break continue try
+or and not mut self true false none""".split())
+ENDER_KW = {'return', 'break', 'continue', 'true', 'false', 'none', 'self'}
 OPS2 = ['==', '!=', '<=', '>=', '+=', '-=', '*=', '/=', '%=', '=>', '->', '?.', '??', '..']
 OPS1 = '+-*/%<>=.,:;()[]{}|'
 ESC = {'n': '\n', 't': '\t', 'r': '\r', '0': '\0', '\\': '\\', '"': '"', '{': '{', '}': '}'}
 ASSIGN = ('=', '+=', '-=', '*=', '/=', '%=')
 CLOSE = {')': '(', ']': '[', '}': '{'}
-TO_HEADS = ('Map', 'SortedMap')
+TO_HEADS = ('Map', 'SortedMap', 'Lru')
 BINOPS = ('+', '-', '*', '/', '%', '==', '!=', '<', '<=', '>', '>=', '??', '..', '..=')
+CMP = ('==', '!=', '<', '<=', '>', '>=')
+DANGLE = BINOPS + (',', ':', '.', '?.', '->', '=>') + ASSIGN
 
 
 class Err(Exception):
@@ -40,7 +44,8 @@ class Lexer:
         s.src = src.replace('\r\n', '\n').replace('\r', '\n')   # CRLF and lone CR are line ends
         s.n = len(s.src)
         s.line, s.ls, s.sub = line, -(col0 - 1), sub
-        s.toks, s.stack = [], []
+        s.toks, s.stack, s.opens = [], [], []
+        s.lines = s.src.split('\n')
     def pos(s, i):
         return s.line, i - s.ls + 1
     def err(s, i, msg):
@@ -70,15 +75,17 @@ class Lexer:
                 while j < n and (src[j].isalnum() or src[j] == '_'):
                     j += 1
                 w = src[i:j]
-                s.add('kw' if w in KW else 'id', w, i)
+                pv = s.toks[-1] if s.toks else None
+                after_dot = pv is not None and pv.k == 'op' and pv.v in ('.', '?.')
+                s.add('kw' if w in KW and not after_dot else 'id', w, i)   # after `.` any word is a member name
                 i = j
             elif c == '"':
                 i = s.string(i)
             else:
                 i = s.op(i)
         if s.stack:
-            ch, l, c = s.stack[-1]
-            raise Err(l, c, "unclosed '%s' (end of file reached)" % ch)
+            o = s.stack[-1]
+            raise s.unclosed(o, "unclosed '%s' (end of file reached)" % o[0])
         if not s.sub and s.toks and s.is_ender(s.toks[-1]):
             s.add('nl', '\n', n)
         s.add('eof', '', n)
@@ -91,30 +98,47 @@ class Lexer:
             return t.v in (')', ']', '}')
         return t.k == 'kw' and t.v in ENDER_KW
     def newline(s, i):
-        if s.stack and s.stack[-1][0] in '([':
-            return                      # nothing ends inside ( ) or [ ]
         t = s.toks[-1] if s.toks else None
+        top = s.stack[-1][0] if s.stack else None
+        if top in ('(', '['):           # nothing ends inside ( ) or [ ]
+            if t is not None and s.is_ender(t):
+                c = s.nextline(i + 1)
+                if c and (s.src[c[0]] in '([' or (s.src[c[0]] == '-' and not s.src.startswith('->', c[0]))):
+                    raise Err(c[1], c[2], "line starts with `%s` after a complete item: add `,` or move it to "
+                              "the previous line" % s.src[c[0]])
+            return
+        if t is not None and t.k == 'op' and t.v == ',' and top == '{':
+            s.add('nl', '\n', i)        # a trailing ',' in an item body ({ }) is allowed
+            return
         if t is not None and s.dangling(t):
-            what = "'%s'" % t.v
-            raise Err(t.line, t.col, "line ends with %s: wrap the whole expression in ( ) "
-                      "(only brackets and a leading '.' continue a line)" % what.replace("'", '`'))
+            raise Err(t.line, t.col, "line ends with `%s`: wrap the whole expression in ( ) "
+                      "(only brackets and a leading '.' continue a line)" % t.v)
         if not s.toks or not s.is_ender(t):
             return
-        c = s.continues(i + 1)
-        if c == 'dot':
-            return
+        c = s.nextline(i + 1)
+        if c and (s.src.startswith('?.', c[0]) or (s.src[c[0]] == '.' and not s.src.startswith('..', c[0]))):
+            if t.k in ('id', 'int', 'float', 'str') or (t.k == 'op' and t.v in (')', ']')) or \
+                    (t.k == 'kw' and t.v in ('self', 'true', 'false', 'none')):
+                return
+            raise Err(c[1], c[2], "line starts with `.` after %s: a leading `.` continues only after `)`, `]`, "
+                      "a name, a literal or `self`" % t.desc().replace("'", '`'))
         if c:
-            l, col = c
-            raise Err(l, col, "line starts with `%s`: wrap the whole expression in ( )"
-                      "%s" % (s.lead, " (for try ... or e { }, keep `or` on the line of the try operand)" if s.lead == 'or' else ''))
+            for w in ('and', 'or'):
+                e = c[0] + len(w)
+                if s.src.startswith(w, c[0]) and not (e < s.n and (s.src[e].isalnum() or s.src[e] == '_')):
+                    raise Err(c[1], c[2], "line starts with `%s`: wrap the whole expression in ( )" % w)
         s.add('nl', '\n', i)
-    @staticmethod
-    def dangling(t):
+    def dangling(s, t):
         if t.k == 'op':
-            return t.v in BINOPS or t.v == ',' or t.v in ASSIGN
-        return t.k == 'kw' and t.v in ('and', 'or')
-    def continues(s, j):
-        """Next non-blank, non-comment line: 'dot' if it starts with . or ?. ; (line, col) if it starts with and / or."""
+            return t.v in DANGLE
+        if t.k == 'kw':
+            return t.v in ('and', 'or', 'not')
+        if t.k == 'id' and t.v in ('of', 'to') and len(s.toks) > 1:
+            p = s.toks[-2]
+            return p.k == 'id' or (p.k == 'op' and p.v in (')', ']'))
+        return False
+    def nextline(s, j):
+        """Start of the next non-blank, non-comment line: (index, line, col), or None at end of file."""
         src, n = s.src, s.n
         line, ls = s.line + 1, j
         while j < n:
@@ -128,17 +152,32 @@ class Lexer:
                 while j < n and src[j] != '\n':
                     j += 1
             else:
-                break
-        else:
-            return False
-        if src.startswith('?.', j) or (src[j] == '.' and not src.startswith('..', j)):
-            return 'dot'
-        for w in ('and', 'or'):
-            e = j + len(w)
-            if src.startswith(w, j) and not (e < n and (src[e].isalnum() or src[e] == '_')):
-                s.lead = w
-                return (line, j - ls + 1)
-        return False
+                return j, line, j - ls + 1
+        return None
+    def unclosed(s, o, msg, at=None):
+        """Error path only: indentation names the likely unclosed opener (meaning never depends on it)."""
+        if not s.sub:
+            best = None
+            for q in s.opens:
+                if q[5] == q[1]:
+                    continue
+                last = q[5] if q[5] else len(s.lines)
+                for ln in range(q[1] + 1, last + 1):
+                    txt = s.lines[ln - 1].strip() if ln <= len(s.lines) else ''
+                    if not txt or txt[0] == '#':
+                        continue
+                    ind = s.indent(s.lines[ln - 1])
+                    if ind < q[3] or (ind == q[3] and txt[0] not in ')]}'):
+                        if best is None or (q[1], q[2]) > (best[0][1], best[0][2]):
+                            best = (q, ln)
+                        break
+            if best:
+                q, ln = best
+                return Err(q[1], q[2], "unclosed `%s` from line %d (the line after it dedents at line %d)" % (q[0], q[1], ln))
+        return Err(at[0], at[1], msg) if at else Err(o[1], o[2], msg)
+    @staticmethod
+    def indent(line):
+        return len(line) - len(line.lstrip(' \t')) + 3 * line[:len(line) - len(line.lstrip(' \t'))].count('\t')
     def number(s, i):
         src, n = s.src, s.n
         j = i
@@ -187,7 +226,7 @@ class Lexer:
             elif c == '\n':
                 break
             j += 1
-        s.err(j, "unterminated '{' in string interpolation")
+        s.err(j, "unterminated '{' in string interpolation (write \\{ for a literal brace)")
     def split_fmt(s, body):
         depth, k = 0, 0
         while k < len(body):
@@ -219,7 +258,10 @@ class Lexer:
                 buf.append(ESC[e])
                 j += 2
             elif c == '{':
-                k = s.scan_interp(src, j + 1)
+                try:
+                    k = s.scan_interp(src, j + 1)
+                except Err:
+                    s.err(j, "unterminated `{` in a string (write \\{ for a literal brace)")
                 body = src[j + 1:k]
                 if not body.strip():
                     s.err(j, "empty interpolation (write \\{ for a literal brace)")
@@ -257,13 +299,16 @@ class Lexer:
             s.err(i, "unexpected character %r" % c)
         l, col = s.pos(i)
         if c in '([{':
-            s.stack.append((c, l, col))
+            o = [c, l, col, s.indent(s.lines[l - 1]) if l <= len(s.lines) else 0, None, 0]
+            s.stack.append(o)
+            s.opens.append(o)
         elif c in ')]}':
             if not s.stack:
                 s.err(i, "unexpected '%s' with nothing open" % c)
-            o, ol, _ = s.stack[-1]
-            if o != CLOSE[c]:
-                s.err(i, "mismatched '%s': the '%s' opened at line %d is still open" % (c, o, ol))
+            o = s.stack[-1]
+            if o[0] != CLOSE[c]:
+                raise s.unclosed(o, "mismatched '%s': the '%s' opened at line %d is still open" % (c, o[0], o[1]), s.pos(i))
+            o[5] = l
             s.stack.pop()
         s.add('op', c, i)
         return i + 1
@@ -307,8 +352,22 @@ class Parser:
     def iskw(s, v, o=0):
         t = s.peek(o)
         return t.k == 'kw' and t.v == v
+    def isw(s, v, o=0):                 # a contextual word: a plain name that means something only here
+        t = s.peek(o)
+        return t.k == 'id' and t.v == v
+    def name_colon(s):                  # any word followed by ':' is a name (argument, parameter, field)
+        return s.peek().k in ('id', 'kw') and s.isop(':', 1)
+    def upper(s, what):
+        t = s.peek()
+        if t.k == 'id' and not t.v[0].isupper():
+            s.fail("%s names must start with a capital letter (found `%s`)" % (what, t.v))
     def accop(s, v):
         if s.isop(v):
+            s.i += 1
+            return True
+        return False
+    def accw(s, v):
+        if s.isw(v):
             s.i += 1
             return True
         return False
@@ -352,6 +411,9 @@ class Parser:
                 continue
             if t.k == 'op' and (t.v == ';' or t.v == end or (commas and t.v == ',')):
                 continue
+            if t.k == 'op' and t.v == ',' and s.peek(1).k == 'nl':
+                s.fail("line ends with `,`: wrap the whole expression in ( ) (a list continues on the next line "
+                       "only inside ( ) or [ ])")
             s.fail("expected end of line or ';' before %s" % t.desc())
     def body(s, what, one, commas=False):
         t = s.peek()
@@ -385,6 +447,17 @@ class Parser:
             h = getattr(s, 'st_' + v, None)
             if h and not (v == 'fn' and s.peek(1).k != 'id'):
                 return h(pub)
+        elif t.k == 'id':               # contextual statement words, recognised by what follows them
+            n1, n2 = s.peek(1), s.peek(2)
+            v = t.v
+            if v == 'use' and n1.k == 'id':
+                return s.st_use(False)
+            if v == 'module' and n1.k == 'id' and n2.k == 'op' and n2.v == '{':
+                return s.st_module(False)
+            if v == 'lock' and (n1.k in ('id', 'str', 'int') or (n1.k == 'kw' and n1.v == 'self')):
+                return s.st_lock(False)
+            if v == 'with' and n1.k == 'id' and n2.k == 'op' and n2.v == '=':
+                return s.st_with(False)
         return s.simple()
     def simple(s):
         e = s.expr()
@@ -402,7 +475,8 @@ class Parser:
         while s.accop('.'):
             path += '.' + s.ident('a module name')
         a = [path]
-        if s.acckw('as'):
+        if s.isw('as') and s.peek(1).k == 'id':
+            s.i += 1
             a += ['as', s.ident()]
         return N('use', a)
     def st_module(s, pub):
@@ -424,17 +498,21 @@ class Parser:
         return s.decl_var(pub, 'const')
     def st_type(s, pub):
         s.i += 1
+        s.upper('type')
         name = s.ident('a type name')
         return N('type', [name] + (['pub'] if pub else []), s.body('type', lambda: s.member('type'), True))
     def st_enum(s, pub):
         s.i += 1
+        s.upper('enum')
         name = s.ident('an enum name')
         return N('enum', [name] + (['pub'] if pub else []), s.body('enum', lambda: s.member('enum'), True))
     def st_iface(s, pub):
         s.i += 1
+        s.upper('interface')
         name = s.ident('an interface name')
         kids = []
-        if s.acckw('is'):
+        if s.isw('is') and s.peek(1).k == 'id':
+            s.i += 1
             names = [s.ident('a built-in capability')]
             while s.accop(','):
                 names.append(s.ident('a built-in capability'))
@@ -446,10 +524,10 @@ class Parser:
         s.expkw('for')
         return N('impl', [i, s.ident('a type name')])
     def member(s, kind):
-        pub = s.acckw('pub')
-        if s.iskw('fn'):
+        pub = False if s.name_colon() else s.acckw('pub')
+        if s.iskw('fn') and not s.name_colon():
             return s.st_fn(pub)
-        if s.iskw('drop') and kind != 'iface':
+        if s.isw('drop') and s.isop('(', 1) and kind != 'iface':
             s.i += 1
             s.expop('(', " after 'drop'")
             ps = s.params()
@@ -457,18 +535,19 @@ class Parser:
             return N('drop', (), ps + [s.block('drop')])
         fl = ['pub'] if pub else []
         if kind == 'type':
-            name = s.ident('a field name or fn')
+            name = s.nxt().v if s.name_colon() else s.ident('a field name or fn')
             s.expop(':', " after the field name")
             kids = [s.type()]
             if s.accop('='):
                 kids.append(N('default', (), [s.expr()]))
             return N('field', [name] + fl, kids)
         if kind == 'enum':
+            s.upper('variant')
             name = s.ident('a variant name or fn')
             vf = []
             if s.accop('('):
                 while not s.isop(')'):
-                    if s.peek().k == 'id' and s.isop(':', 1):
+                    if s.name_colon():
                         n = s.nxt().v
                         s.i += 1
                         vf.append(N('vfield', [n], [s.type()]))
@@ -488,11 +567,12 @@ class Parser:
         return out
     def param(s):
         mode = None
-        if s.iskw('mut') or s.iskw('take'):
+        if not s.name_colon() and (s.iskw('mut') or (s.isw('take') and (s.peek(1).k == 'id' or s.iskw('self', 1)))):
             mode = s.nxt().v
-        if s.acckw('self'):
+        if s.iskw('self') and not s.name_colon():
+            s.i += 1
             return N('recv', [mode or 'self'])
-        name = s.ident('a parameter name')
+        name = s.nxt().v if s.name_colon() else s.ident('a parameter name')
         kids = []
         if s.accop(':'):
             kids.append(s.type())
@@ -507,7 +587,7 @@ class Parser:
         s.expop(')', " after the parameters")
         if s.accop('->'):
             kids.append(N('ret', (), [s.type()]))
-        fl = (['pub'] if pub else []) + (['fails'] if s.acckw('fails') else [])
+        fl = (['pub'] if pub else []) + (['fails'] if s.accw('fails') else [])
         if s.isop('{'):
             kids.append(s.block('function'))
         return N('fn', [name] + fl, kids)
@@ -553,15 +633,16 @@ class Parser:
         return N('with', [name], [e, s.block('with')])
 
     # ---- types
-    def type(s):
+    def type(s, inner=False):
         t = s.peek()
-        if s.acckw('dyn'):
+        if s.isw('dyn') and s.peek(1).k == 'id':
+            s.i += 1
             return N('dyn', [s.ident('an interface name')])
         if s.acckw('fn'):
             s.expop('(', " after 'fn' in a function type")
             args = []
             while not s.isop(')'):
-                mode = s.nxt().v if (s.iskw('mut') or s.iskw('take')) else None
+                mode = s.nxt().v if (s.iskw('mut') or (s.isw('take') and not (s.isop(',', 1) or s.isop(')', 1)))) else None
                 a = s.type()
                 args.append(N(mode, (), [a]) if mode else a)
                 if not s.accop(','):
@@ -569,7 +650,7 @@ class Parser:
             s.expop(')')
             if s.accop('->'):
                 args.append(N('ret', (), [s.type()]))
-            return N('fnt', ['fails'] if s.acckw('fails') else [], args)
+            return N('fnt', ['fails'] if s.accw('fails') else [], args)
         if s.accop('('):
             ts = [s.type()]
             while s.accop(','):
@@ -577,11 +658,16 @@ class Parser:
             s.expop(')')
             return N('ttuple', (), ts)
         name = s.ident('a type')
-        if not s.acckw('of'):
+        if not (s.isw('of') and s.peek(1).k != 'nl'):
             return N('t', [name])
-        kids = [s.type()]
-        if name in TO_HEADS and s.acckw('to'):
-            kids.append(s.type())
+        s.i += 1
+        kids = [s.type(name in TO_HEADS)]
+        if s.isw('to') and s.peek(1).k != 'nl':
+            if name in TO_HEADS:
+                s.i += 1
+                kids.append(s.type())
+            elif not inner:
+                s.fail("`to` follows only Map, SortedMap, Lru")
         return N('t', [name], kids)
 
     # ---- patterns
@@ -641,9 +727,9 @@ class Parser:
         s.fail("expected a pattern, found %s" % t.desc())
 
     # ---- expressions
-    def expr(s, no_or=False):
+    def expr(s):
         l = s.p_and()
-        while not no_or and s.iskw('or'):
+        while s.iskw('or'):
             s.i += 1
             l = N('bin', ['or'], [l, s.p_and()])
         return l
@@ -655,7 +741,15 @@ class Parser:
     def p_not(s):
         if s.acckw('not'):
             return N('un', ['not'], [s.p_not()])
-        return s.binlevel(s.p_coalesce, ('==', '!=', '<', '<=', '>', '>='))
+        l = s.p_coalesce()
+        t = s.peek()
+        if t.k == 'op' and t.v in CMP:
+            s.i += 1
+            l = N('bin', [t.v], [l, s.p_coalesce()])
+            t = s.peek()
+            if t.k == 'op' and t.v in CMP:
+                s.fail("comparisons don't chain: use `and`")
+        return l
     def p_coalesce(s):
         return s.binlevel(s.p_range, ('??',))
     def p_range(s):
@@ -686,10 +780,11 @@ class Parser:
         return s.postfix()
     def try_expr(s):
         s.i += 1
-        e = s.expr(no_or=True)          # 'or' after a try operand starts the handler
-        if s.acckw('context'):
-            return N('try-context', (), [e, s.expr(no_or=True)])
-        if s.acckw('or'):
+        e = s.postfix()                 # the operand is one postfix chain; `else` starts the handler
+        if s.isw('context') and (s.peek(1).k != 'op' or s.isop('(', 1)):
+            s.i += 1
+            return N('try-context', (), [e, s.expr()])
+        if s.acckw('else'):
             name = s.ident("a name for the error (or '_')")
             return N('try-or', [name], [e, s.block('try handler')])
         return N('try', (), [e])
@@ -703,7 +798,7 @@ class Parser:
             if v in ('.', '?.'):
                 s.i += 1
                 nt = s.peek()
-                if nt.k not in ('id', 'int'):
+                if nt.k not in ('id', 'kw', 'int'):
                     s.fail("expected a field or method name after '%s', found %s" % (v, nt.desc()))
                 s.i += 1
                 q = '?' if v == '?.' else ''
@@ -727,21 +822,25 @@ class Parser:
             out.append(s.arg())
             if not s.accop(','):
                 break
-        s.expop(')', " or ',' in the argument list")
+        s.close_list(')', "the argument list")
         return out
+    def close_list(s, c, what):
+        if not s.isop(c):
+            t = s.peek()
+            if t.k in ('id', 'int', 'float', 'str', 'kw'):
+                s.fail("expected `,` or `%s` in %s, found %s: a `,` is probably missing" % (c, what, t.desc()))
+            s.fail("expected `,` or `%s` in %s, found %s" % (c, what, t.desc()))
+        s.i += 1
     def arg(s):
         if s.accop('.'):
             name = s.ident('a field name after the leading .')
             while s.accop('.'):
                 name += '.' + s.ident('a field name')
-            if s.iskw('desc'):
-                s.i += 1
-                return N('key', [name, 'desc'])
-            if s.peek().k == 'id' and s.peek().v == 'asc':
-                s.i += 1
-                return N('key', [name, 'asc'])
+            for w in ('desc', 'asc'):
+                if s.accw(w):
+                    return N('key', [name, w])
             return N('key', [name])
-        if s.peek().k == 'id' and s.isop(':', 1):
+        if s.name_colon():
             name = s.nxt().v
             s.i += 1
             return N('named', [name], [s.expr()])
@@ -757,7 +856,10 @@ class Parser:
             return s.string(t.v)
         if k == 'id':
             s.i += 1
-            if s.iskw('of'):
+            if t.v == 'crew' and s.peek().k == 'id' and s.isop('{', 1):
+                name = s.nxt().v
+                return N('crew', [name], [s.block('crew')])
+            if s.isw('of') and s.peek(1).k != 'nl':
                 s.i -= 1
                 return s.type()          # 'Pool of Widget' in expression position; a call may follow
             return N('name', [t.v])
@@ -778,10 +880,6 @@ class Parser:
                 return s.match_expr()
             if v == 'fn':
                 return s.lambda_()
-            if v == 'crew':
-                s.i += 1
-                name = s.ident('a crew name')
-                return N('crew', [name], [s.block('crew')])
             if v == 'else':
                 s.fail("'else' must follow the closing '}' of the if on the same line ('} else {')")
         if k == 'op':
@@ -807,7 +905,7 @@ class Parser:
                     items.append(s.expr())
                     if not s.accop(','):
                         break
-                s.expop(']', " to close the list")
+                s.close_list(']', "the list")
                 return N('list', (), items)
             if t.v == '{':
                 s.fail("unexpected '{': a block must start on the same line as its header, and braces are never "
@@ -853,7 +951,13 @@ class Parser:
         if s.acckw('if'):
             kids.append(N('guard', (), [s.expr()]))
         s.expop('=>', " after the match pattern")
-        kids.append(s.block('match arm') if s.isop('{') else s.stmt())
+        if s.isop('{'):
+            kids.append(s.block('match arm'))
+        else:
+            st = s.peek()
+            kids.append(s.stmt())
+            if kids[-1].k in ('assign', 'opassign'):
+                s.fail("`=>` takes an expression; use `{ }` for statements", st)
         return N('arm', (), kids)
     def lambda_(s):
         s.i += 1
@@ -861,7 +965,11 @@ class Parser:
         ps = s.params()
         s.expop(')')
         if s.accop('=>'):
-            return N('lambda', (), ps + [s.expr()])
+            st = s.peek()
+            e = s.expr()
+            if s.peek().k == 'op' and s.peek().v in ASSIGN:
+                s.fail("`=>` takes an expression; use `{ }` for statements", st)
+            return N('lambda', (), ps + [e])
         if s.isop('{'):
             return N('lambda', (), ps + [s.block('lambda')])
         s.fail("expected '=>' or '{' after the lambda parameters, found %s" % s.peek().desc())

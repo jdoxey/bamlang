@@ -159,7 +159,7 @@ fn part3() fails {
     c.go(fn() => worker(2, TEXTS[1]))
     c.go(fn() => worker3(TEXTS[2], m, tally))
     c.go(fn() => worker(4, TEXTS[3]))
-  } or e {
+  } else e {
     print("error: {e}")                              # error: worker 2: config.ini:2: missing '=' (plus 1 more)
     Unit
   }

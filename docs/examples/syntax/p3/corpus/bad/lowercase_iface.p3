@@ -1,0 +1,4 @@
+# expect: 2: interface names must start with a capital letter
+iface shape {
+  fn area(self) -> Int
+}
