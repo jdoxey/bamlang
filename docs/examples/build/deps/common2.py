@@ -811,7 +811,10 @@ def nm_symbols(obj):
         for line in r.stdout.splitlines():
             f = line.split()
             if len(f) >= 2 and f[-2] in ("T", "D", "B", "R", "S", "C") and f[-1] not in _SKIP_SYMS:
-                syms.add(f[-1])
+                name = f[-1]
+                if sys.platform == "darwin" and name.startswith("_"):
+                    name = name[1:]          # Mach-O prefixes C symbols with '_'
+                syms.add(name)
         return syms
     return None
 
