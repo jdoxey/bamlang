@@ -24,8 +24,8 @@ forbids by name. A must not be Accepted in its current form.
 
 | Option | Reach | Simp | Transp | Safety | Errors | Impl | Syntax | Perf | Total |
 |---|---|---|---|---|---|---|---|---|---|
-| A | 2 | 4 | 4 | 4 | 5 | 4 | 4 | 4 | 77 |
+| A | 2 | 4 | 4 | 4 | 5 | 4 | 4 | 4 | 74 (originally misstated as 77) |
 | I | 4 | 3 | 3 | 5 | 3 | 3 | 5 | 4 | 73 |
 | C | 4 | 3 | 2 | 2 | 2 | 4 | 3 | 2 | 57 |
 
-With `Id` (F3) and the derived-operation rules (F8), A's Safety returns to 5, giving A 80 and a 7-point lead.
+With `Id` (F3) and the derived-operation rules (F8), A's Safety returns to 5, giving A 77 (originally misstated as 80), a 4-point lead: still a tie.
