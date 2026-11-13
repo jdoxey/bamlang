@@ -1,0 +1,9 @@
+# expect: 6: 'else' is only valid
+fn f(x: Int) do
+  if x > 0 do
+    print("a")
+  end
+  else do
+    print("b")
+  end
+end

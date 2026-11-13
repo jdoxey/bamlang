@@ -1,0 +1,4 @@
+# expect: 3: unterminated string
+fn f() do
+  print("hello)
+end

@@ -1,0 +1,9 @@
+# expect: 2: unclosed `do` (missing `end`)
+fn f(x: Int) do
+  if x > 0 do
+    print("a")
+  else if x < 0 do
+    print("b")
+  else do
+    print("c")
+end

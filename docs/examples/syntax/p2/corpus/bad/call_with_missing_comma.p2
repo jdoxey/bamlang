@@ -1,0 +1,4 @@
+# expect: 3: expected ')' or ',' in the argument list
+fn f(a: Int, b: Int) do
+  g(a b)
+end

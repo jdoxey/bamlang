@@ -1,0 +1,7 @@
+# expect: 7: unexpected `end` with nothing open
+fn f(x: Int) do
+  if x > 0 do
+    print("pos")
+  end
+  end
+end

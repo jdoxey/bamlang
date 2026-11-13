@@ -1,0 +1,398 @@
+# widgets in P1 syntax, from widgets/o9s.txt. Pools, handles, cascading drops, closures that capture handles.
+enum Kind do
+  Window
+  Panel
+  Button
+  Label
+  Image
+end
+
+type OnClick do
+  action: Str
+  arg: Str
+  run: fn(Handle of Widget)          # a closure plus a label for `tree`
+end
+
+type Widget do
+  kind: Kind
+  name: Str
+  text: Str
+  parent: Handle of Widget
+  kids: List of Handle of Widget = []
+  on_click: Optional of OnClick = none
+  img: Handle of CacheEntry = none
+  sub: Handle of Sub = none
+
+  drop(mut self) do
+    print("  drop {self.kind} {self.name}")
+    if cache.has(self.img) do
+      release_image(self.img)
+    end
+    if subs.has(self.sub) do
+      unsubscribe(self.sub)
+    end
+  end
+end
+
+type CacheEntry do
+  file: Str
+  bytes: Str
+  users: Int
+  drop(mut self) do
+    print("  cache: drop {self.file}")
+  end
+end
+
+type Sub do
+  run: fn(Handle of Sub)
+  drop(mut self) do
+    print("  drop subscriber")
+  end
+end
+
+var widgets = Pool of Widget()
+var subs = Pool of Sub()
+var cache = Pool of CacheEntry()
+var windows: List of Handle of Widget = []
+var sub_order: List of Handle of Sub = []
+var count = 0
+
+# ---- image cache: a hand-written user count
+fn acquire_image(file: Str) -> Handle of CacheEntry do
+  for h in cache.handles() do
+    if cache[h].file == file do
+      cache[h].users += 1
+      print("  cache: share {file} users={cache[h].users}")
+      return h
+    end
+  end
+  let bytes = file.repeat(100)
+  print("  cache: new {file} ({bytes.len()} bytes)")
+  return cache.add(CacheEntry(file: file.copy(), bytes: bytes, users: 1))
+end
+
+fn release_image(h: Handle of CacheEntry) do
+  if e = cache.get(h) do
+    e.users -= 1
+    print("  cache: release {e.file} users={e.users}")
+    if e.users == 0 do
+      cache.remove(h)
+    end           # e is borrowed: the drop runs when this block ends
+  else do
+    # already gone: nothing to release
+  end
+end
+
+# ---- model and subscribers
+fn subscribe(run: fn(Handle of Sub)) -> Handle of Sub do
+  let h = subs.add(Sub(run: run))
+  sub_order.push(h)
+  return h
+end
+
+fn unsubscribe(h: Handle of Sub) do
+  sub_order.remove_value(h)
+  subs.remove(h)
+end
+
+fn notify() do
+  for h in sub_order.copy() do
+    # callbacks may unsubscribe, so iterate a copy
+    if s = subs.get(h) do
+      s.run(h)
+    else do
+      # unsubscribed earlier in this same notify: skip
+    end
+  end
+end
+
+fn label_changed(label: Handle of Widget, me: Handle of Sub, once: Bool) do
+  if w = widgets.get(label) do
+    w.text = "count={count}"
+    print("  notify {w.name}: {w.text}")
+    if once do
+      print("  once: {w.name} unsubscribes itself")
+      w.sub = none
+      unsubscribe(me)
+    end
+  else do
+    print("  notify: label gone")
+  end
+end
+
+# ---- widgets
+fn find_widget(name: Str) -> Handle of Widget do
+  for h in widgets.handles() do
+    if widgets[h].name == name do
+      return h
+    end
+  end
+  return none
+end
+
+fn new_widget(parent: Handle of Widget, kind: Kind, name: Str, arg: Str) -> Handle of Widget do
+  var w = Widget(kind: kind, name: name.copy(), text: arg.copy(), parent: parent)
+  if kind == Kind.Image do
+    w.img = acquire_image(arg)
+  end
+  let subscribing = kind == Kind.Label and (arg == "count" or arg == "count-once")
+  if subscribing do
+    w.text = "count={count}"
+  end
+  let h = widgets.add(w, owner: parent)          # w moves in; the parent may be borrowed
+  if parent == none do
+    windows.push(h)
+  else do
+    widgets[parent].kids.push(h)
+  end
+  if subscribing do
+    let once = arg == "count-once"
+    widgets[h].sub = subscribe(fn(s) => label_changed(h, s, once))
+    print("  subscribed {name}")
+  end
+  return h
+end
+
+fn remove_widget(h: Handle of Widget) do
+  let kind = widgets[h].kind
+  let parent = widgets[h].parent
+  if kind == Kind.Window do
+    windows.remove_value(h)
+  else if p = widgets.get(parent) do
+    p.kids.remove_value(h)
+  else do
+    # parent already gone: nothing to detach from
+  end
+  widgets.remove(h)                              # the whole subtree goes with it
+end
+
+fn enclosing_window(h: Handle of Widget) -> Handle of Widget do
+  var cur = h
+  while cur != none do
+    if widgets[cur].kind == Kind.Window do
+      return cur
+    end
+    cur = widgets[cur].parent
+  end
+  return none
+end
+
+# ---- callbacks: closures capturing handles and owned strings
+fn inc_click() -> OnClick do
+  return OnClick(action: "inc", arg: "", run: fn(_) do
+    count += 1
+    print("  count={count}")
+    notify()
+  end)
+end
+
+fn close_click() -> OnClick do
+  return OnClick(action: "close", arg: "", run: fn(me) do
+    let win = enclosing_window(me)
+    if win == none do
+      print("  close: no enclosing window")
+    else do
+      print("  close: removing window {widgets[win].name}")
+      remove_widget(win)                         # removes the button that is running this closure
+    end
+  end)
+end
+
+fn open_click(window_name: Str) -> OnClick do
+  let n = window_name.copy()
+  return OnClick(action: "open", arg: n.copy(), run: fn(_) do
+    if find_widget(n) != none do
+      print("  open: {n} already exists")
+    else do
+      let win = new_widget(none, Kind.Window, n, "")
+      new_widget(win, Kind.Label, "{n}-label", "opened")
+      let b = new_widget(win, Kind.Button, "{n}-close", "")
+      widgets[b].on_click = some(close_click())
+      print("  open: created window {n}")
+    end
+  end)
+end
+
+fn unsub_click(target: Handle of Widget, label_name: Str) -> OnClick do
+  return OnClick(action: "unsub", arg: label_name.copy(), run: fn(_) do
+    if l = widgets.get(target) do
+      if subs.has(l.sub) do
+        print("  unsub: {l.name} unsubscribed")
+        unsubscribe(l.sub)
+        l.sub = none
+      else do
+        print("  unsub: {l.name} is not subscribed")
+      end
+    else do
+      print("  unsub: label no longer exists (stale handle)")
+    end
+  end)
+end
+
+# ---- commands
+fn need(a: Optional of Str, what: Str) -> Str fails do
+  if v = a do
+    return v
+  end
+  fail "{what} needs an argument"
+end
+
+fn find_label(name: Str) -> Handle of Widget fails do
+  let h = find_widget(name)
+  if h == none or widgets[h].kind != Kind.Label do
+    fail "no such label {name}"
+  end
+  return h
+end
+
+fn cmd_window(name: Str) do
+  if find_widget(name) != none do
+    error("name {name} already exists"); return
+  end
+  new_widget(none, Kind.Window, name, "")
+  print("created window {name}")
+end
+
+fn cmd_add(parent_name: Str, kind_name: Str, name: Str, arg: Optional of Str) do
+  let p = find_widget(parent_name)
+  if p == none do
+    error("no such widget {parent_name}"); return
+  end
+  if widgets[p].kind != Kind.Window and widgets[p].kind != Kind.Panel do
+    error("{parent_name} cannot have children")
+    return
+  end
+  let kind = Kind.parse(kind_name)
+  if kind == none or kind == Kind.Window do
+    error("unknown kind {kind_name}"); return
+  end
+  if find_widget(name) != none do
+    error("name {name} already exists"); return
+  end
+  if kind == Kind.Image and arg == none do
+    error("image {name} needs a file name"); return
+  end
+  new_widget(p, kind, name, arg ?? "")
+  print("added {kind_name} {name} to {parent_name}")
+end
+
+fn cmd_on(name: Str, action: Str, arg: Optional of Str) fails do
+  let b = find_widget(name)
+  if b == none do
+    error("no such widget {name}"); return
+  end
+  if widgets[b].kind != Kind.Button do
+    error("{name} is not a button"); return
+  end
+  let cb = match action do
+    "inc"   => inc_click()
+    "close" => close_click()
+    "open"  => do
+      let a = try need(arg, "open")
+      open_click(a)
+    end
+    "unsub" => do
+      let a = try need(arg, "unsub")
+      let l = try find_label(a)
+      unsub_click(l, a)
+    end
+    _       => fail "unknown action {action}"
+  end
+  if old = widgets[b].on_click do
+    print("  replaced callback '{old.action}'")
+  end
+  widgets[b].on_click = some(cb)                 # the old closure is freed here
+  print("{name}.on_click = {action}")
+end
+
+fn cmd_click(name: Str) do
+  let h = find_widget(name)
+  if h == none do
+    error("no such widget {name}"); return
+  end
+  if b = widgets.get(h) do
+    if b.kind != Kind.Button do
+      error("{name} is not a button")
+    else if cb = b.on_click do
+      cb.run(h)                                  # may remove this very button
+      print("click {b.name} done" + (if widgets.has(h) do
+        ""
+      else do
+        " (button removed itself)"
+      end))
+    else do
+      print("click {b.name}: no callback")
+    end
+  end
+end
+
+fn cmd_remove(name: Str) do
+  let h = find_widget(name)
+  if h == none do
+    error("no such widget {name}"); return
+  end
+  remove_widget(h)
+  print("removed {name}")
+end
+
+fn print_tree(h: Handle of Widget, depth: Int) do
+  if w = widgets.get(h) do
+    var line = "{indent(depth)}{w.kind} {w.name}"
+    if w.kind == Kind.Label do
+      line += " \"{w.text}\"" + (if subs.has(w.sub) do
+        " [subscribed]"
+      else do
+        ""
+      end)
+    end
+    if w.kind == Kind.Image do
+      line += " {w.text}"
+    end
+    if oc = w.on_click do
+      line += " [on:{oc.action} {oc.arg}]"
+    end
+    print(line)
+    for k in w.kids do
+      print_tree(k, depth + 1)
+    end
+  else do
+    print("{indent(depth)}(stale child)")
+  end
+end
+
+fn cmd_tree() do
+  if windows.is_empty() do
+    print("(no windows)")
+  end
+  for h in windows do
+    print_tree(h, 0)
+  end
+end
+
+fn cmd_stats() do
+  print("stats: widgets={widgets.len()} subscribers={subs.len()} cache={cache.len()} count={count}")
+end
+
+fn main() do
+  for line in stdin.lines() do
+    if line.starts_with("#") or line.is_blank() do
+      continue
+    end
+    print("> {line}")
+    let t = line.split(" ")
+    match t[0] do
+      "window" => cmd_window(t[1])
+      "add"    => cmd_add(t[1], t[2], t[3], t.get(4))
+      "on"     => do
+        try cmd_on(t[1], t[2], t.get(3)) or e do
+          error("{e}")
+        end
+      end
+      "click"  => cmd_click(t[1])
+      "remove" => cmd_remove(t[1])
+      "tree"   => cmd_tree()
+      "stats"  => cmd_stats()
+      _        => error("unknown command {t[0]}")
+    end
+  end
+end

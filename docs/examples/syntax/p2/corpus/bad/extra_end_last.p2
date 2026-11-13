@@ -1,0 +1,6 @@
+# expect: 6: unexpected `end` with nothing open
+fn f(x: Int) do
+  print(x)
+end
+
+end

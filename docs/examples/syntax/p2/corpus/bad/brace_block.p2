@@ -1,0 +1,4 @@
+# expect: 2: unexpected '{'
+fn f(x: Int) {
+  print(x)
+}

@@ -1,0 +1,314 @@
+# types in P1 syntax, from types/t3plus/types.txt. Methods live inside the type; conformance is `impl I for T`.
+
+module core do
+  # B1. Shape: a set OTHERS extend -> iface + dyn
+  iface Shape is show do
+    fn area(self) -> Float
+    fn name(self) -> Str
+    fn describe(self) -> Str do
+      # provided: has a body, never overridden
+      return "{self.name()} {self.area():.2}"
+    end
+    fn intersects(self, other: dyn Shape) -> Bool do
+      # a dyn parameter borrows, no allocation
+      return self.area().sqrt() + other.area().sqrt() > 5.0
+    end
+  end
+
+  type Circle do
+    r: Float
+
+    pub fn new(r: Float) -> Circle fails do
+      if r <= 0.0 do
+        fail "bad radius {r}"
+      end
+      return Circle(r: r)
+    end
+    fn area(self) -> Float do
+      return PI * self.r * self.r
+    end
+    fn name(self) -> Str do
+      return "circle"
+    end
+  end
+
+  type Rect do
+    w: Float
+    h: Float
+
+    pub fn new(w: Float, h: Float) -> Rect fails do
+      if w <= 0.0 or h <= 0.0 do
+        fail "bad size {w}x{h}"
+      end
+      return Rect(w: w, h: h)
+    end
+    fn area(self) -> Float do
+      return self.w * self.h
+    end
+    fn name(self) -> Str do
+      return "rect"
+    end
+  end
+
+  impl Shape for Circle
+  impl Shape for Rect
+
+  # B2. Widget: closed core kinds + open plugin kinds -> enum with ONE Ext(dyn) variant
+  pub enum Event do
+    Click
+    Drag(Int)
+    Close
+  end
+  const FOCUS = "focus moves to next"
+
+  iface WidgetKind do
+    fn render(self, depth: Int) -> Str
+    fn event(mut self, path: List of Int, ev: Event) -> Str
+    fn close(take self) -> Str
+    fn focus_next(self) -> Str do
+      return FOCUS
+    end
+  end
+
+  # shared routing, public so a plugin container reuses it: Close at the last step takes the child out
+  pub fn route(mut children: List of Widget, path: List of Int, ev: Event) -> Str do
+    match (path, ev) do
+      ([], _) => return "ignored"
+      ([i], Close) if i < children.len() => do
+        let c = children.take_out(i)
+        return "consumed {c.close()}; {FOCUS}"
+      end
+      ([i, ..rest], _) => return match children.get_mut(i) do
+        some(c) => c.event(rest, ev)
+        none => "no such widget"
+      end
+      _ => return "ignored"
+    end
+  end
+
+  pub enum Widget do
+    Panel(children: List of Widget)
+    Button(label: Str)
+    Ext(dyn WidgetKind)
+
+    pub fn panel(children: List of Widget) -> Widget do
+      return Panel(children)
+    end
+    pub fn button(label: Str) -> Widget fails do
+      if label == "" do
+        fail "empty label"
+      end
+      return Button(label)
+    end
+
+    fn render(self, depth: Int) -> Str do
+      match self do
+        Panel(children) => do
+          var out = "{indent(depth)}Panel\n"
+          for c in children do
+            out += c.render(depth + 1)
+          end
+          return out
+        end
+        Button(label) => return "{indent(depth)}Button {label}\n"
+        Ext(d)        => return d.render(depth)
+      end
+    end
+
+    fn event(mut self, path: List of Int, ev: Event) -> Str do
+      match self do
+        Panel(children) => return route(children, path, ev)
+        Button(label)   => match ev do
+          Click => return "pressed {label}; {FOCUS}"
+          _ => return "ignored"
+        end
+        Ext(d)          => return d.event(path, ev)
+      end
+    end
+
+    fn collapse(mut self) do
+      match self do
+        Panel(children) => do
+          let n = children.len(); self = Button("panel of {n}")
+        end
+        _ => do
+        end
+      end
+    end
+
+    fn close(take self) -> Str do
+      match self do
+        Panel(children) => return "Panel[{children.map(fn(c) do c.close() end).join(", ")}]"
+        Button(label)   => return "Button {label}"
+        Ext(d)          => return d.close()
+      end
+    end
+  end
+
+  # B3. Money: private field + fails constructor
+  type Money do
+    cents: Int
+
+    pub fn new(cents: Int) -> Money fails do
+      if cents < 0 do
+        fail "negative money {cents}"
+      end
+      return Money(cents: cents)
+    end
+    pub fn cents(self) -> Int do
+      return self.cents
+    end
+    pub fn plus(self, o: Money) -> Money do
+      return Money(cents: self.cents + o.cents)
+    end
+    pub fn minus(self, o: Money) -> Optional of Money do
+      if o.cents > self.cents do
+        return none
+      end
+      return some(Money(cents: self.cents - o.cents))
+    end
+  end
+
+  type Account do
+    owner: Str
+    balance: Money
+
+    pub fn new(owner: Str, balance: Money) -> Account fails do
+      if owner == "" do
+        fail "empty owner"
+      end
+      return Account(owner: owner, balance: balance)
+    end
+    pub fn deposit(mut self, m: Money) do
+      self.balance = self.balance.plus(m)
+    end
+    pub fn withdraw(mut self, m: Money) fails do
+      match self.balance.minus(m) do
+        some(b) => self.balance = b
+        none    => fail "insufficient funds: balance {self.balance.cents()}, need {m.cents()}"
+      end
+    end
+  end
+
+  pub fn transfer(mut pool: Pool of Account, a: Handle of Account, b: Handle of Account, m: Money) fails do
+    with src = pool[a] do
+      try src.withdraw(m)
+    end
+    with dst = pool[b] do
+      dst.deposit(m)
+    end
+  end
+end
+
+module plugin do
+  use core.Shape
+  use core.WidgetKind
+  use core.Widget
+
+  type Hexagon do
+    side: Float
+
+    pub fn new(side: Float) -> Hexagon fails do
+      if side <= 0.0 do
+        fail "bad side {side}"
+      end
+      return Hexagon(side: side)
+    end
+    fn area(self) -> Float do
+      return 3.0 * 3.0.sqrt() / 2.0 * self.side * self.side
+    end
+    fn name(self) -> Str do
+      return "hexagon"
+    end
+    fn grow(mut self, k: Float) do
+      self.side = self.side * k
+    end    # fields are only self.side, never bare `side`
+  end
+  impl Shape for Hexagon
+
+  type SliderSpec do
+    pub value: Int
+    pub max: Int = 10
+  end        # DSL-style: every field pub, defaults allowed
+
+  type Slider do
+    value: Int
+    max: Int
+
+    pub fn new(s: SliderSpec) -> Slider fails do
+      if s.value < 0 or s.value > s.max do
+        fail "slider out of range"
+      end
+      return Slider(value: s.value, max: s.max)
+    end
+    fn render(self, depth: Int) -> Str do
+      return "{indent(depth)}Slider {self.value}/{self.max}\n"
+    end
+    fn event(mut self, path: List of Int, ev: Event) -> Str do
+      match ev do
+        Drag(d) => do
+          let old = self.value
+          self.value = clamp(old + d, 0, self.max)
+          return "value {old} -> {self.value}; {self.focus_next()}"
+        end
+        _ => return "ignored"
+      end
+    end
+    fn close(take self) -> Str do
+      return "Slider {self.value}/{self.max}"
+    end
+  end
+  impl WidgetKind for Slider
+
+  # a plugin container: holds core Widgets, reuses core's route
+  type Tabs do
+    children: List of Widget
+
+    pub fn new(children: List of Widget) -> Tabs fails do
+      if children.is_empty() do
+        fail "empty tabs"
+      end
+      return Tabs(children: children)
+    end
+    fn render(self, depth: Int) -> Str do
+      var out = "{indent(depth)}Tabs\n"
+      for c in self.children do
+        out += c.render(depth + 1)
+      end
+      return out
+    end
+    fn event(mut self, path: List of Int, ev: Event) -> Str do
+      return route(self.children, path, ev)
+    end
+    fn close(take self) -> Str do
+      return "Tabs[{self.children.map(fn(c) do c.close() end).join(", ")}]"
+    end
+  end
+  impl WidgetKind for Tabs
+end
+
+fn b1() fails do
+  let c1 = try Circle.new(1.0)
+  let h1 = try Hexagon.new(2.0)
+  let r1 = try Rect.new(2.0, 3.0)
+  let shapes: List of dyn Shape = [c1, h1, r1]
+  var total = 0.0
+  for s in shapes do
+    print(s.describe()); total += s.area()
+  end
+  print("total {total:.2}")
+  eprint("{shapes[0].intersects(shapes[1])} {shapes[1].show()}")
+end
+
+fn b2() fails do
+  let cancel = try Widget.button("Cancel")
+  let ok = try Widget.button("OK")
+  let slider = try Slider.new(SliderSpec(value: 3))      # max defaulted
+  let inner = Widget.panel([cancel])
+  var root = Widget.panel([ok, Widget.Ext(slider), inner])
+  print("build"); print(root.render(0))
+  let x = try Widget.button("X")
+  let tabs = try Tabs.new([x])
+  var t = Widget.panel([Widget.Ext(tabs)])
+  root.collapse()
+end

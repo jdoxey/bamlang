@@ -1,0 +1,3 @@
+# expect: 2: unclosed `do` (missing `end`)
+fn f(x: Int) do
+  print(x)

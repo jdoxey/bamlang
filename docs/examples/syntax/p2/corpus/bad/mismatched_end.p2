@@ -1,0 +1,4 @@
+# expect: 4: mismatched `end`: the '(' opened at line 3
+fn f() do
+  print(1, 2
+end

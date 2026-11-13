@@ -1,0 +1,112 @@
+# tricky: the ten hardest snippets from research.md, plus extras. Meaning is by the P2 rules only (blocks are `do ... end`).
+
+# 1. return, newline, value: a bare return, then an unreachable expression statement
+fn t1() -> Int do
+  let x = 1
+  return
+  x
+end
+
+# 2. a line starting with ( or [ is a new statement, never a call or an index of the line before
+fn t2(a: Int) do
+  let b = a
+  (b)
+  [1, 2]
+  b
+  (a, b)
+end
+
+# 3. unary minus at the start of a line is a new statement; a trailing minus continues; `a -b` is binary
+fn t3(a: Int, b: Int) do
+  let c = a
+  -c
+  let d = a -
+    b
+  let e = a -b
+  let f = a - -b
+end
+
+# 4. leading-dot chains continue across blank lines and comment lines; ?. at line start too
+fn t4(items: List of Int) do
+  let r = items
+    .filter(fn(x) => x > 0)
+
+    # a comment between the links
+    .map(fn(x) => x * 2)
+    ?.first()
+  r
+end
+
+# 5. a trailing operator, comma or opener continues
+fn t5(a: Int, b: Int) -> Int do
+  let s = a +
+    b *
+    2
+  let t = [
+    1,
+    2,
+  ]
+  return s
+end
+
+# 6. leading and / or continue a multi-line condition
+fn t6(a: Int, b: Int, c: Int) -> Bool do
+  if a > 0
+      and b > 0
+      or c > 0 do
+    return true
+  end
+  return a > 0 and
+    b > 0
+end
+
+# 7. the `do` ends the header line, also for lambdas; `else`/`else if` lines stand alone and one `end` closes the chain
+fn t7(items: List of Int, c: Crew) do
+  c.go(fn() do
+    for x in items do
+      print(x)
+    end
+  end)
+  if items.is_empty() do
+    print("empty")
+  else if items.len() == 1 do
+    print("one")
+  else do
+    print("many")
+  end
+end
+
+# 8. try handlers: `or e do` stays on the line of the try operand (or continues from the next line)
+fn t8() fails do
+  let a = try f(1) or e do
+    return
+  end
+  let b = try f(2)
+    or _ do
+    end
+  try g() context "ctx"
+end
+
+# 9. multi-line argument lists with trailing commas; named args; field-list ordering args
+fn t9(rows: List of Row) do
+  let sorted = rows.sort_by(
+    .dept,
+    .salary desc,
+    .name,
+  )
+  let w = Widget(
+    label: "OK",
+    size: 3,
+  )
+  rows.sort_by(.dept desc, .a.b)
+end
+
+# 10. multi-line declarations; a < b > (c) is two comparisons, never a generic
+fn t10(
+  a: Int,
+  b: Int,
+  c: Int = 3,
+) -> Int do
+  let g = a < b > (c)
+  return g
+end

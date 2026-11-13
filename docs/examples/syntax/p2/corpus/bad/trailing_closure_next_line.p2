@@ -1,0 +1,7 @@
+# expect: 4: unexpected `do`
+fn f(items: List of Int) do
+  items.each(1)
+  do
+    print("each")
+  end
+end

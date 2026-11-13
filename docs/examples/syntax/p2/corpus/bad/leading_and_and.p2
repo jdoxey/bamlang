@@ -1,0 +1,5 @@
+# expect: 4: unknown operator '&&'; use 'and'
+fn f(a: Bool, b: Bool) -> Bool do
+  return a
+    && b
+end

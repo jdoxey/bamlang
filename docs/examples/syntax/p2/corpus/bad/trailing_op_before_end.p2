@@ -1,0 +1,4 @@
+# expect: 4: expected an expression, found 'end'
+fn f() do
+  let x = 1 +
+end
