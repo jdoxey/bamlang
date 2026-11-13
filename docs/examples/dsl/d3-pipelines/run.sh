@@ -31,5 +31,5 @@ for f in "$P3N"/corpus/bad/*.p3; do
 done
 rm -rf "$tmp"
 if [ $fail -ne 0 ]; then exit 1; fi
-"$PY" ../metrics.py corpus/*.d3
+"$PY" ../metrics.py corpus/todo.d3 corpus/build.d3 corpus/spec.d3
 echo "d3 dsl corpus OK"

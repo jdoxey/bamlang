@@ -1,0 +1,4 @@
+# expect: 3: a list clause has no `else`
+fn f(xs: List of Int) {
+  let x = [for p in xs => p else 0]
+}

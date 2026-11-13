@@ -1,0 +1,5 @@
+# expect: Text has no parameter 'contents'
+use extras.ui
+fn f(ui: Ui of Msg) -> Node of Msg {
+  return Text(contents: "hi")
+}

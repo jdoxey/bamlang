@@ -1,0 +1,4 @@
+# expect: 3: an `if` without `else` is not a value in a list
+fn f(c: Bool) {
+  let a = [1, if c { 2 }]
+}

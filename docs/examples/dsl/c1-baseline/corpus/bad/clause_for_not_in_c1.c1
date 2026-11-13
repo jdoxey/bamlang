@@ -1,0 +1,4 @@
+# expect: 3: expected an expression, found 'for'
+fn f(xs: List of Int) {
+  let a = [for x in xs => x]
+}

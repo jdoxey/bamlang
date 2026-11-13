@@ -1,11 +1,13 @@
 # Benchmark 2, build file, D1. Three targets, shared defaults, an OS conditional, a loop over platforms.
+use extras.build
+
 const PLATFORMS = ["linux-x64", "macos-arm64", "windows-x64"]
 const VERSION = "1.4.0"
 
 pub fn build(b: Build) -> Project {
   let windows = b.os == Os.Windows
   let defaults = Defaults(std: "c11", warnings: true, opt: if b.release { Opt.Speed } else { Opt.None })
-  return Project(name: "acme", version: VERSION, defaults, targets: [
+  return Project(name: "acme", version: VERSION.copy(), defaults, targets: [
     Lib(
       name: "core",
       srcs: b.glob(pattern: "src/core/*.c"),
@@ -20,6 +22,6 @@ pub fn build(b: Build) -> Project {
     ),
     Exe(name: "cli", srcs: ["src/cli/main.c"], deps: ["core"]),
     Exe(name: "core_tests", srcs: b.glob(pattern: "tests/*.c"), deps: ["core"], test: true),
-    for p in PLATFORMS => Package(name: "acme-{p}", platform: p, deps: ["cli"], archive: if p.starts_with(prefix: "windows") { Zip } else { TarGz }),
+    for p in PLATFORMS => Package(name: "acme-{p}", platform: p.copy(), deps: ["cli"], archive: if p.starts_with(prefix: "windows") { Archive.Zip } else { Archive.TarGz }),
   ])
 }

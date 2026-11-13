@@ -10,7 +10,7 @@ Work top to bottom. Tick an item when its ADR is Accepted or its milestone passe
 - [x] **D4 Errors and absence** (Full). ADR-0004 Accepted 2026-11-13: `fails`/`try` over `Result` values, one `Error`, no null, traps caught only at crews and tests.
 - [x] **D5 Types and OO** (Full). ADR-0005 Accepted 2026-11-13: methods in types with receiver modes, nominal `iface` + `dyn`, provided functions, no inheritance.
 - [x] **D6 Core syntax** (Full). ADR-0006 Accepted 2026-11-13: newline-terminated, only brackets or a leading `.` continue; braces; `Name(field: v)`; corpus and parser in `docs/examples/syntax/p3/`.
-- [ ] **D7 DSL and declarative layout** (Full). The mechanism for G11 without macros or annotations.
+- [x] **D7 DSL and declarative layout** (Full). ADR-0007 Accepted 2026-11-14: `if`/`for` clause items in list literals, one desugaring; DSL libraries in the stdlib dialect; examples in `docs/examples/dsl/`.
 - [ ] **D8 Compiler implementation** (Full). Host language, backend, debug info (G8) and coverage (G9) on all three OSes.
 - [ ] **D9 Modules, build and dependencies** (Full). Dependencies are git repos (G7); lockfile and reproducibility.
 - [ ] **D10 Standard library v1 scope** (Light). Lists, arrays, time, calendar and what else (G6).

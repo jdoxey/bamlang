@@ -1,48 +1,106 @@
-# Benchmark 3, a test suite (nested groups, shared setup) and an HTML page, D1.
-fn spec() -> Spec {
-  return Group(name: "Stack", setup: fn() => Stack.new(), kids: [
+# Benchmark 3, a test suite (20 cases, nested groups, shared setup as a plain function) and an HTML page, D1.
+use std.test
+use extras.html
+
+type Stack {
+  items: List of Int = []
+
+  pub fn new() -> Stack { return Stack() }
+  pub fn push(mut self, item: Int) { self.items.push(item) }
+  pub fn pop(mut self) -> Optional of Int { return self.items.pop() }
+  pub fn peek(self) -> Optional of Int { return self.items.last() }
+  pub fn len(self) -> Int { return self.items.len() }
+  pub fn is_empty(self) -> Bool { return self.items.is_empty() }
+  pub fn clear(mut self) { self.items.clear() }
+}
+
+# Shared setup: a plain function, called by each case body (bodies capture at most a copied Int).
+fn stack_of(count: Int) -> Stack {
+  var s = Stack.new()
+  for i in 1..=count { s.push(item: i) }
+  return s
+}
+
+fn spec() -> Suite {
+  return Group(name: "Stack", kids: [
     Group(name: "empty", kids: [
-      Case(name: "is empty", body: fn(s) => expect(ok: s.is_empty())),
-      Case(name: "pop gives none", body: fn(s) => expect_eq(actual: s.pop(), expected: none)),
-      Case(name: "peek gives none", body: fn(s) => expect_eq(actual: s.peek(), expected: none)),
+      Case(name: "is empty", body: fn() { try expect(ok: stack_of(count: 0).is_empty()) }),
+      Case(name: "len is 0", body: fn() { try expect_eq(actual: stack_of(count: 0).len(), expected: 0) }),
+      Case(name: "pop gives none", body: fn() { var s = stack_of(count: 0); try expect_eq(actual: s.pop(), expected: none) }),
+      Case(name: "peek gives none", body: fn() { try expect_eq(actual: stack_of(count: 0).peek(), expected: none) }),
     ]),
-    Group(name: "with three items", before: fn(s) { s.push(item: 1); s.push(item: 2); s.push(item: 3) }, kids: [
-      Case(name: "len is 3", body: fn(s) => expect_eq(actual: s.len(), expected: 3)),
-      Case(name: "pop gives the last pushed", body: fn(s) => expect_eq(actual: s.pop(), expected: some(value: 3))),
-      Group(name: "after one pop", before: fn(s) { s.pop() }, kids: [
-        Case(name: "len is 2", body: fn(s) => expect_eq(actual: s.len(), expected: 2)),
-        Case(name: "peek gives 2", body: fn(s) => expect_eq(actual: s.peek(), expected: some(value: 2))),
+    Group(name: "with three items", kids: [
+      Case(name: "len is 3", body: fn() { try expect_eq(actual: stack_of(count: 3).len(), expected: 3) }),
+      Case(name: "peek gives the last pushed", body: fn() { try expect_eq(actual: stack_of(count: 3).peek(), expected: some(value: 3)) }),
+      Case(name: "pop gives the last pushed", body: fn() { var s = stack_of(count: 3); try expect_eq(actual: s.pop(), expected: some(value: 3)) }),
+      Group(name: "after one pop", kids: [
+        Case(name: "len is 2", body: fn() { var s = stack_of(count: 3); s.pop(); try expect_eq(actual: s.len(), expected: 2) }),
+        Case(name: "peek gives 2", body: fn() { var s = stack_of(count: 3); s.pop(); try expect_eq(actual: s.peek(), expected: some(value: 2)) }),
+        Case(name: "pop gives 2", body: fn() { var s = stack_of(count: 3); s.pop(); try expect_eq(actual: s.pop(), expected: some(value: 2)) }),
       ]),
-      Case(name: "clear empties", body: fn(s) { s.clear(); expect(ok: s.is_empty()) }),
+      Case(name: "clear empties", body: fn() { var s = stack_of(count: 3); s.clear(); try expect(ok: s.is_empty()) }),
+      Case(name: "push makes len 4", body: fn() { var s = stack_of(count: 3); s.push(item: 9); try expect_eq(actual: s.len(), expected: 4) }),
     ]),
     Group(name: "push many", kids: [
-      for n in [1, 10, 1000] => Case(name: "len after {n} pushes", body: fn(s) {
-        for i in 0..n { s.push(item: i) }
-        expect_eq(actual: s.len(), expected: n)
+      for n in [1, 10, 1000] => Case(name: "len after {n} pushes", body: fn() {
+        try expect_eq(actual: stack_of(count: n).len(), expected: n)
+      }),
+    ]),
+    Group(name: "values", kids: [
+      for v in [0, -1, 7, 1000000] => Case(name: "{v} round-trips", body: fn() {
+        var s = Stack.new()
+        s.push(item: v)
+        try expect_eq(actual: s.pop(), expected: some(value: v))
       }),
     ]),
   ])
 }
 
-const LINKS = [Link(label: "Home", url: "/"), Link(label: "Stock", url: "/stock"), Link(label: "About", url: "/about")]
+type Link {
+  label: Str
+  url: Str
+}
 
-fn page(heading: Str, rows: List of Row) -> Html {
+type Menu {
+  title: Str
+  links: List of Link
+}
+
+type StockRow {
+  name: Str
+  qty: Int
+  price: Float
+}
+
+const MENUS = [
+  Menu(title: "Shop", links: [Link(label: "Home", url: "/"), Link(label: "Stock", url: "/stock")]),
+  Menu(title: "Info", links: [Link(label: "About", url: "/about")]),
+]
+
+fn page(heading: Str, rows: List of StockRow) -> Elem {
   return Html(kids: [
-    Head(kids: [Title(text: heading)]),
+    Head(kids: [Title(text: heading.copy())]),
     Body(kids: [
       Nav(kids: [
-        for l in LINKS => A(label: l.label, href: l.url),
+        for menu in MENUS => for l in menu.links => A(label: l.label.copy(), href: l.url.copy()),
       ]),
-      H1(text: heading),
+      H1(text: heading.copy()),
       Table(kids: [
-        Tr(kids: [for h in ["Name", "Qty", "Price"] => Th(text: h)]),
+        Tr(kids: [for h in ["Name", "Qty", "Price"] => Th(text: h.copy())]),
         if rows.is_empty() => Tr(kids: [Td(text: "no rows", colspan: 3)]),
         for r in rows => Tr(kids: [
-          Td(text: r.name),
+          Td(text: r.name.copy()),
           Td(text: "{r.qty}", align: Align.Right),
           Td(text: "{r.price:.2}", align: Align.Right),
         ]),
       ]),
     ]),
   ])
+}
+
+# Escaping demo: a user-supplied name containing markup is rendered as text (see NOTES.md for the output).
+fn main() {
+  let rows: List of StockRow = [StockRow(name: "<script>alert(1)</script>", qty: 2, price: 9.5)]
+  print(text: page(heading: "Stock & Co", rows).render())
+  run(suite: spec())
 }

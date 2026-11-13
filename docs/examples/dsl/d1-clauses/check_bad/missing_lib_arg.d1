@@ -1,0 +1,5 @@
+# expect: Button is missing required on_click
+use extras.ui
+fn f(ui: Ui of Msg) -> Node of Msg {
+  return Button(label: "hi")
+}

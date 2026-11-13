@@ -1,0 +1,4 @@
+# expect: 3: a list clause has no `else`
+fn f(a: Bool) {
+  let x = [if a => 1 else 2]
+}

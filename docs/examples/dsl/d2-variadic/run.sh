@@ -30,5 +30,5 @@ for f in ../../syntax/p3/corpus/bad/*.p3; do
 done
 rm -rf "$tmp"
 if [ $fail -ne 0 ]; then exit 1; fi
-"$PY" ../metrics.py corpus/*.d2
+"$PY" ../metrics.py corpus/todo.d2 corpus/build.d2 corpus/spec.d2
 echo "d2 dsl corpus OK"

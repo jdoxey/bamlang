@@ -1,0 +1,9 @@
+# extras.build -- stdlib generic dialect; every target constructor returns Target, so a mixed target list is a List of Target.
+# Types: Build (fields os: Os, release: Bool), Project, Defaults, Target; enums Os { Linux, Macos, Windows }, Opt { None, Speed, Size },
+# Archive { Zip, TarGz }.
+Project(name, version, defaults, targets) -> Project       # targets: List of Target
+Defaults(std, warnings, opt) -> Defaults
+Lib(name, srcs, defines=, links=) -> Target                # srcs, defines, links: List of Str
+Exe(name, srcs, deps=, test=) -> Target                    # deps: List of Str
+Package(name, platform, deps, archive) -> Target           # archive: Archive
+.glob(pattern) -> List of Str                              # on Build

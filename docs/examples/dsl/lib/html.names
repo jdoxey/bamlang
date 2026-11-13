@@ -1,0 +1,17 @@
+# extras.html -- stdlib generic-free dialect; everything is an Elem. Escaping is the default: every `text`, `label` and
+# `content` argument is escaped (&, <, >, ") when rendered; only Raw(html:) is inserted as written.
+# enum Align { Left, Right }.
+Html(kids) -> Elem                                         # kids: List of Elem
+Head(kids) -> Elem
+Body(kids) -> Elem
+Nav(kids) -> Elem
+Table(kids) -> Elem
+Tr(kids) -> Elem
+Title(text) -> Elem                                        # escaped
+H1(text) -> Elem                                           # escaped
+Th(text) -> Elem                                           # escaped
+Td(text, colspan=, align=) -> Elem                         # escaped
+A(label, href) -> Elem                                     # label and href escaped
+Text(content) -> Elem                                      # escaped
+Raw(html) -> Elem                                          # NOT escaped; the only way to emit markup from a string
+.render() -> Str                                           # on Elem

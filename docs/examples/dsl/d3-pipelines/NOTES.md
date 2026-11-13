@@ -49,3 +49,7 @@ files (4436 -> 5679; build.d3 +24%, spec.d3 +42%), the largest increase of the o
 - Better: puns appear for free in the method-heavy build file: `.defaults(defaults)` (build.d3:16) stays as short as before.
 - The static-checking claim improves: `Node` is declared in the file, so `check_labels.py` checks its setters and combinators
   (todo.d3: 26 calls checked); a wrong label name on `.child(…)` is now a compile error, not a runtime one.
+**Review F8 (loop 2):** the adversarial review found this corpus illegal under the accepted ADRs: `Node.children_of` is a user-declared generic function
+(ADR-0002 rule 1: no user type parameters) and the field `gap` clashes with the method `gap` (ADR-0005 rule 7: a field and a method cannot share a name).
+It was not rebuilt; this directory stays as the record, with its old numbers. A rebuild would need a non-generic `children_of` and renamed fields,
+and it still would not escape the F9 finding (a forgotten leading `.` parses silently).

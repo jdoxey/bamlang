@@ -1,0 +1,4 @@
+# expect: 3: expected `=>` in the `if` clause
+fn f(o: Optional of Int) {
+  let x = [if v = o -> v]
+}

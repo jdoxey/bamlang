@@ -1,8 +1,15 @@
-# Benchmark 1, todo UI, D1 (clause items in lists). Library types: Column, Row, Text, Input, Button, Checkbox.
+# Benchmark 1, todo UI, D1 (clause items in lists). Libraries: extras.ui (../../lib/ui.names), generic over the app's Msg.
+use extras.ui
+
 type Todo {
   id: Int
   title: Str
   done: Bool
+}
+
+type User {
+  name: Str
+  avatar: Str
 }
 
 enum Filter { All, Active, Done }
@@ -19,6 +26,7 @@ type Model {
   items: List of Todo = []
   filter: Filter = Filter.All
   next_id: Int = 1
+  user: Optional of User = none
 }
 
 fn label_of(f: Filter) -> Str {
@@ -29,19 +37,33 @@ fn label_of(f: Filter) -> Str {
   }
 }
 
-fn visible(m: Model) -> List of Todo {
-  return match m.filter {
-    All => m.items,
-    Active => m.items.filter(keep: fn(t) => not t.done),
-    Done => m.items.filter(keep: fn(t) => t.done),
+fn shown(f: Filter, t: Todo) -> Bool {
+  return match f {
+    All => true,
+    Active => not t.done,
+    Done => t.done,
   }
 }
 
-fn view(m: Model, ui: Ui) -> Node {
-  let draft = ui.slot(name: "draft", initial: "")
-  let shown = visible(m)
+fn has_done(m: Model) -> Bool {
+  for t in m.items {
+    if t.done { return true }
+  }
+  return false
+}
+
+fn view(m: Model, ui: Ui of Msg) -> Node of Msg {
+  let draft = ui.text_slot(name: "draft", initial: "")
+  let rows: List of Node of Msg = [
+    for t in m.items if shown(f: m.filter, t) => Row(gap: 4, key: "todo-{t.id}", kids: [
+      Checkbox(checked: t.done, on_toggle: Msg.Toggle(id: t.id)),
+      Text(content: t.title.copy(), style: if t.done { Style.Struck } else { Style.Normal }),
+      Button(label: "x", on_click: Msg.Delete(id: t.id)),
+    ]),
+  ]
   return Column(gap: 8, kids: [
     Text(content: "Todos", style: Style.Title),
+    if u = m.user => Row(gap: 2, kids: [Avatar(url: u.avatar.copy()), Text(content: u.name.copy(), style: Style.Dim)]),
     Row(gap: 4, kids: [
       Input(key: "draft", slot: draft, placeholder: "What needs doing?", on_enter: Msg.Add(title: draft.get())),
       Button(label: "Add", on_click: Msg.Add(title: draft.get())),
@@ -50,13 +72,9 @@ fn view(m: Model, ui: Ui) -> Node {
       for f in [Filter.All, Filter.Active, Filter.Done] =>
         Button(label: label_of(f), key: "tab-{f}", active: m.filter == f, on_click: Msg.SetFilter(filter: f)),
     ]),
-    if shown.is_empty() => Text(content: "Nothing to do", style: Style.Dim),
-    for t in shown => Row(key: "todo-{t.id}", gap: 4, kids: [
-      Checkbox(checked: t.done, on_toggle: Msg.Toggle(id: t.id)),
-      Text(content: t.title, style: if t.done { Style.Struck } else { Style.Normal }),
-      Button(label: "x", on_click: Msg.Delete(id: t.id)),
-    ]),
-    if m.items.any(test: fn(t) => t.done) => Button(label: "Clear completed", on_click: Msg.ClearDone),
+    if rows.is_empty() => Text(content: "Nothing to do", style: Style.Dim),
+    Column(gap: 0, kids: rows),
+    if has_done(m) => Button(label: "Clear completed", on_click: Msg.ClearDone),
   ])
 }
 

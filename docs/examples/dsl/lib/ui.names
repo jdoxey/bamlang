@@ -1,0 +1,15 @@
+# extras.ui -- written in the stdlib generic dialect; M is the application's message type (the app's `Msg` fills it).
+# One signature per line (NAMES.md shape): `Name(p, q=)` constructor/function, `.name(..)` method, `Type.name(..)` static.
+# `=` marks a defaulted parameter. After `->` is the result type (documentation; the checker reads names only).
+# Types: Node of M (every constructor returns it), Ui of M, Slot of T. enum Style { Normal, Title, Dim, Struck }.
+# Children are `List of Node of M`. Every list item is a store site typed from the expected element type.
+Column(gap=, key=, kids) -> Node of M                      # kids: List of Node of M
+Row(gap=, key=, kids) -> Node of M                         # kids: List of Node of M
+Text(content, style=) -> Node of M                         # content: Str (stored, so a borrowed Str needs .copy())
+Avatar(url, size=) -> Node of M                            # url: Str
+Input(key, slot, placeholder, on_enter) -> Node of M       # slot: Slot of Str, on_enter: M
+Checkbox(checked, on_toggle) -> Node of M                  # on_toggle: M
+Button(label, key=, active=, on_click) -> Node of M        # label: Str, on_click: M
+.text_slot(name, initial) -> Slot of Str                   # on Ui of M; the slot lives in the runtime, the handle copies
+.get() -> T                                                # on Slot of T; returns a copy (ADR-0001 rule 3: getters copy)
+.set(value)                                                # on Slot of T

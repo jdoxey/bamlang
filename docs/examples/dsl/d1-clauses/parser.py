@@ -339,6 +339,7 @@ def render(n, d, out):
 class Parser:
     def __init__(s, toks):
         s.t, s.i = toks, 0
+        s.pending = None                # D1: an if-expression already parsed by item(), to be used as the next primary
     def peek(s, o=0):
         return s.t[min(s.i + o, len(s.t) - 1)]
     def nxt(s):
@@ -741,7 +742,7 @@ class Parser:
             l = N('bin', ['and'], [l, s.p_not()])
         return l
     def p_not(s):
-        if s.acckw('not'):
+        if not s.pending and s.acckw('not'):
             return N('un', ['not'], [s.p_not()])
         l = s.p_coalesce()
         t = s.peek()
@@ -775,9 +776,9 @@ class Parser:
             else:
                 return l
     def p_unary(s):
-        if s.accop('-'):
+        if not s.pending and s.accop('-'):
             return N('un', ['-'], [s.p_unary()])
-        if s.iskw('try'):
+        if not s.pending and s.iskw('try'):
             return s.try_expr()
         return s.postfix()
     def try_expr(s):
@@ -863,6 +864,9 @@ class Parser:
             return N('named', list(e.a), [e])      # `x` means `x: x`
         s.fail("argument needs a name: write 'name: value' (a pun is one lowercase identifier, not self, a type or a parenthesised name)", st)
     def primary(s):
+        if s.pending:
+            e, s.pending = s.pending, None
+            return e
         t = s.peek()
         k = t.k
         if k == 'int' or k == 'float':
@@ -930,8 +934,8 @@ class Parser:
                 s.fail("unexpected '{': a block must start on the same line as its header, and braces are never "
                        "literals (construct with Name(field: value))")
         s.fail("expected an expression, found %s" % t.desc())
-    # ---- D1: clause items, legal only as list items.  The first token decides: `for` always starts a clause;
-    # `if` starts one when its condition is followed by `=>` (an `if` followed by `{` is still an if-expression).
+    # ---- D1: clause items, legal only as list items; the body of a clause is itself an item (clauses nest).
+    # `if` is parsed once: after its condition, `=>` makes a clause, `{` an if-expression (no rewinding).
     def item(s):
         if s.name_colon():
             return s.expr()
@@ -941,24 +945,33 @@ class Parser:
             if not s.iskw('in'):
                 s.fail("expected 'in' after the pattern of a `for` clause, found %s" % s.peek().desc())
             s.i += 1
-            it = s.expr()
-            kids = [pat, it]
+            kids = [pat, s.expr()]
             if s.acckw('if'):
                 kids.append(N('guard', (), [s.expr()]))
             s.clause_arrow('for')
-            kids.append(s.expr())
+            kids.append(s.clause_body())
             return N('item-for', (), kids)
-        if s.iskw('if') and not (s.peek(1).k == 'id' and s.isop('=', 2)):
-            start = s.i
+        if s.iskw('if'):
+            at = s.peek()
             s.i += 1
-            cond = s.expr()
+            name, c = s.if_head()
             if s.isop('=>'):
                 s.i += 1
-                return N('item-if', (), [cond, s.expr()])
+                body = s.clause_body()
+                return N('item-iflet', [name], [c, body]) if name else N('item-if', (), [c, body])
             if not s.isop('{'):
                 s.clause_arrow('if')
-            s.i = start                  # an ordinary if-expression
+            e = s.if_tail(name, c)
+            if not (e.c and e.c[-1].k == 'else'):
+                s.fail("an `if` without `else` is not a value in a list; write the clause `if <condition> => <item>`", at)
+            s.pending = e                # the if-expression is the primary; operators may follow it
+            return s.expr()
         return s.expr()
+    def clause_body(s):
+        b = s.item()
+        if s.iskw('else'):
+            s.fail("a list clause has no `else`; for one-or-other write an if-expression: `if c { a } else { b }`")
+        return b
     def clause_arrow(s, what):
         if not s.isop('=>'):
             s.fail("expected `=>` in the `%s` clause (a list clause is `%s … => item`), found %s"
@@ -984,16 +997,18 @@ class Parser:
         return N('interp', (), kids)
     def if_expr(s):
         s.i += 1
+        name, c = s.if_head()
+        if name is None and s.isop('=>'):
+            s.fail("an `if … =>` clause is only allowed as an item directly inside `[ ]`")
+        return s.if_tail(name, c)
+    def if_head(s):                     # after `if`: (binding name or None, expression)
         if s.peek().k == 'id' and s.isop('=', 1):
             name = s.nxt().v
             s.i += 1
-            e = s.expr()
-            node = N('iflet', [name], [e, s.block('if')])
-        else:
-            c = s.expr()
-            if s.isop('=>'):
-                s.fail("an `if … =>` clause is only allowed as an item directly inside `[ ]`")
-            node = N('if', (), [c, s.block('if')])
+            return name, s.expr()
+        return None, s.expr()
+    def if_tail(s, name, c):
+        node = N('iflet', [name], [c, s.block('if')]) if name else N('if', (), [c, s.block('if')])
         if s.acckw('else'):
             node.c.append(N('else', (), [s.if_expr() if s.iskw('if') else s.block('else')]))
         return node

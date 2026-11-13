@@ -1,0 +1,4 @@
+# expect: 3: expected '{' to open the if body
+fn f(c: Bool) {
+  let a = [1, if c => 2]
+}

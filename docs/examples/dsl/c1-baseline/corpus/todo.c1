@@ -1,0 +1,100 @@
+# Benchmark 1, todo UI, C1 (baseline: no new syntax; map, + and push). Libraries: extras.ui (../../lib/ui.names), generic over the app's Msg.
+use extras.ui
+
+type Todo {
+  id: Int
+  title: Str
+  done: Bool
+}
+
+type User {
+  name: Str
+  avatar: Str
+}
+
+enum Filter { All, Active, Done }
+
+enum Msg {
+  Add(title: Str)
+  Toggle(id: Int)
+  Delete(id: Int)
+  SetFilter(filter: Filter)
+  ClearDone
+}
+
+type Model {
+  items: List of Todo = []
+  filter: Filter = Filter.All
+  next_id: Int = 1
+  user: Optional of User = none
+}
+
+fn label_of(f: Filter) -> Str {
+  return match f {
+    All => "All",
+    Active => "Active",
+    Done => "Done",
+  }
+}
+
+fn shown(f: Filter, t: Todo) -> Bool {
+  return match f {
+    All => true,
+    Active => not t.done,
+    Done => t.done,
+  }
+}
+
+fn has_done(m: Model) -> Bool {
+  for t in m.items {
+    if t.done { return true }
+  }
+  return false
+}
+
+fn view(m: Model, ui: Ui of Msg) -> Node of Msg {
+  let draft = ui.text_slot(name: "draft", initial: "")
+  var rows: List of Node of Msg = []
+  for t in m.items {
+    if shown(f: m.filter, t) {
+      rows.push(item: Row(gap: 4, key: "todo-{t.id}", kids: [
+        Checkbox(checked: t.done, on_toggle: Msg.Toggle(id: t.id)),
+        Text(content: t.title.copy(), style: if t.done { Style.Struck } else { Style.Normal }),
+        Button(label: "x", on_click: Msg.Delete(id: t.id)),
+      ]))
+    }
+  }
+  var kids: List of Node of Msg = [Text(content: "Todos", style: Style.Title)]
+  if u = m.user {
+    kids.push(item: Row(gap: 2, kids: [Avatar(url: u.avatar.copy()), Text(content: u.name.copy(), style: Style.Dim)]))
+  }
+  kids.push(item: Row(gap: 4, kids: [
+    Input(key: "draft", slot: draft, placeholder: "What needs doing?", on_enter: Msg.Add(title: draft.get())),
+    Button(label: "Add", on_click: Msg.Add(title: draft.get())),
+  ]))
+  kids.push(item: Row(gap: 2, kids: [Filter.All, Filter.Active, Filter.Done].map(each: fn(f) =>
+    Button(label: label_of(f), key: "tab-{f}", active: m.filter == f, on_click: Msg.SetFilter(filter: f)))))
+  if rows.is_empty() { kids.push(item: Text(content: "Nothing to do", style: Style.Dim)) }
+  kids.push(item: Column(gap: 0, kids: rows))
+  if has_done(m) { kids.push(item: Button(label: "Clear completed", on_click: Msg.ClearDone)) }
+  return Column(gap: 8, kids)
+}
+
+fn update(mut m: Model, msg: Msg) {
+  match msg {
+    Add(title) => {
+      if title != "" {
+        m.items.push(item: Todo(id: m.next_id, title, done: false))
+        m.next_id += 1
+      }
+    },
+    Toggle(id) => {
+      for t in m.items.iter_mut() {
+        if t.id == id { t.done = not t.done }
+      }
+    },
+    Delete(id) => { m.items.retain(keep: fn(t) => t.id != id) },
+    SetFilter(f) => { m.filter = f },
+    ClearDone => { m.items.retain(keep: fn(t) => not t.done) },
+  }
+}

@@ -1,0 +1,7 @@
+# std.test -- stdlib generic dialect (expect_eq is generic over any T that can be compared and shown).
+# Types: Suite (Group and Case both return it), Case.body is `fn() fails`.
+Group(name, kids) -> Suite                                 # kids: List of Suite
+Case(name, body) -> Suite                                  # body: fn() fails; capture-free apart from copied Ints
+expect(ok) fails                                           # ok: Bool
+expect_eq(actual, expected) fails                          # error text "expected {expected}, got {actual}"; the runner adds the case path
+run(suite) -> Int                                          # prints one line per failing case, then a summary; returns the failure count

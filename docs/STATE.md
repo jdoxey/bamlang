@@ -2,29 +2,30 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D7 (DSL), resumed. Issue #4 done: ADR-0006 amendment 1, every argument is `name: value` (with `f(count)` as shorthand for `count: count`); cost +8% of code. If you'd rather have `print("hi")` than `print(text: "hi")`, say so on an issue: that fallback (one-parameter calls unlabelled) is ready.
-- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (newline-terminated, braces, `Name(field: v)`; parser and corpus in `docs/examples/syntax/p3/`). Veto by opening an issue.
+- **Now:** D8, compiler implementation (host language, backend, debug info, coverage on three OSes). After D8: `docs/PLAN.md`.
+- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]` inside list literals). Veto by opening an issue.
 - **Needs you:** nothing. Issue #3 answered (yes); your mitigations are in ADR-0002.
 
 ## Next action
 
-**D7 loop 2** (review `0007-research/review-d1.md`): `docs/examples/dsl/lib/` declares the UI, build, HTML and test libraries in the stdlib generic dialect. D1's grammar is fixed (nesting, `if x = opt =>`, no rewind); the D1 corpus is rewritten with copies, 20 test cases and escaping; the C1 baseline (no new syntax) is built. Then rescore D1 vs C1 by script and write ADR-0007 (a tie goes to D1 on G11 unless C1 reads as well).
+Roadmap item **D8** (ADR-0008, Full). Inputs passed on by earlier ADRs:
+- ADR-0001: pools with generations and segmented storage, deferred drop, owner cascades, run-time borrow flags, `Mutex`.
+- ADR-0003: crews on OS threads, cooperative cancellation, debug wait-for-cycle detection, release thread dump.
+- ADR-0004: traps unwind with drops; inline error traces.
+- ADR-0005: vtables, type descriptors (G8), and the link-time `dyn` call-graph check.
+- ADR-0006 and amendment 1: the M0 corpus comes from `docs/examples/syntax/p3n/`; M2 does the label checks.
+- ADR-0007: lower clauses by the desugaring; decide per-frame allocation.
+- G8 (debugger shows real values, DWARF/PDB on all three OSes), G9 (coverage), R9 (three OSes in CI).
 
-
-Roadmap item **D7** (ADR-0007, Full). Inputs:
-- G11 and Q15: is G11 syntax only, or a UI framework in v1? Earlier ADRs assumed syntax only for v1. Decide.
-- ADR-0006 left trailing closures open (they collide with `if f(x) {`); its review's UI sample (nested `Name(children: [...])`) had a `]), ])` staircase.
-- ADR-0005: `pub` fields with defaults, named arguments, `iface` + `dyn`, the Widget enum with `Ext`. ADR-0001's DSL constraint: state is framework-owned and addressed by handles; callbacks capture handles.
-
-1. Step 1: research (SwiftUI result builders, Kotlin type-safe builders and Compose, Flutter, Elm/HTML DSLs, QML, Jetpack, Gradle Kotlin DSL, Ruby blocks, Lua tables), with what went wrong (G3: annotations and macros).
+1. Step 1: research host languages (OCaml, Rust, Go, C, Zig, Swift) and backends (LLVM 19 is installed, C as a backend, QBE, Cranelift), with debug info and coverage per OS, and what went wrong for other compilers (Zig's LLVM split, Go's own backend, Odin and Jai on Windows, Swift's build times).
 2. Step 2: criteria first, then 6 sane and 4 crazy ideas, plus combinations.
-3. Step 3: extend the P3 parser (copy it to `docs/examples/dsl/<option>/`) for each finalist's DSL form, and write a UI layout, a build file and an HTML or test DSL in each. Parse them in CI, and run one end to end through a small interpreter or C model if the option needs runtime support.
-4. Step 4: an Opus reviewer attacks the winner; scores by script; decide; ADR under 300 lines.
+3. Step 3: for the top 3, build a tiny compiler front-to-back for one corpus program (`chatsim` subset or a smaller program), producing an executable on all three OSes in CI, with a debugger breakpoint showing a struct and a coverage report.
+4. Step 4: a Fable 5.2 reviewer (until 2026-11-16, then Opus) attacks the winner; scores by script; ADR. Then write `docs/PLAN.md`.
 
 ## Open questions carried forward
 
 - **Issue #3 (G3 reading):** answered yes by John. D9 must restrict the generic dialect to the stdlib and `extras`; D10 must set the container quality bar.
-- **Q15, is G11 syntax only:** decide in D7. Until then, assume syntax only for v1.
+- **Q15:** closed by ADR-0007 (G11 is syntax; frameworks are libraries; D10 scopes the UI library).
 - From ADR-0001: D3 must define channels, `Mutex of T` and the main-thread rule; D4 optional handles and traps; D5 methods on pool entries.
 
 ## Environment
@@ -38,6 +39,8 @@ Roadmap item **D7** (ADR-0007, Full). Inputs:
 Nothing.
 
 ## Log
+
+- 2026-11-14: issue #4 handled (ADR-0006 amendment 1); D7 done (ADR-0007 Accepted after two loops; C1 baseline tied, broken by the examples and G11).
 
 - 2026-11-13: repo set up from the planning conversation.
 - 2026-11-13: first run on Sonnet skipped the real-examples step. John reset `main`; that work is on the `sonnet-attempt` branch for reference only.

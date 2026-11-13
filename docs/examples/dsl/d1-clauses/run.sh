@@ -29,7 +29,17 @@ done
 for f in "$P3N"/corpus/bad/*.p3; do
   if "$PY" parser.py "$f" >/dev/null 2>&1; then echo "FAIL p3n $f: parsed, expected an error"; fail=1; fi
 done
+if [ $fail -ne 0 ]; then rm -rf "$tmp"; exit 1; fi
+# every corpus call checked against lib/*.names (via the file's `use` lines) and the file's own declarations
+if ! "$PY" ../check_labels.py --parser parser.py corpus/*.d1 > "$tmp/cl" 2>&1; then cat "$tmp/cl"; rm -rf "$tmp"; exit 1; fi
+cat "$tmp/cl"
+for f in check_bad/*.d1; do
+  exp=$(head -1 "$f" | sed -n 's/^# expect: *\(.*\)$/\1/p' | tr -d '\r')
+  if "$PY" ../check_labels.py --parser parser.py "$f" >/dev/null 2>"$tmp/err"; then echo "FAIL $f: accepted, expected an error"; rm -rf "$tmp"; exit 1; fi
+  case "$(cat "$tmp/err")" in *"$exp"*) ;; *) echo "FAIL $f: expected '$exp', got: $(cat "$tmp/err")"; rm -rf "$tmp"; exit 1 ;; esac
+done
+# nested list items must parse in linear time (review F7); fails above 2 s
+if ! "$PY" timing.py; then rm -rf "$tmp"; exit 1; fi
 rm -rf "$tmp"
-if [ $fail -ne 0 ]; then exit 1; fi
-"$PY" ../metrics.py corpus/*.d1
+"$PY" ../metrics.py corpus/todo.d1 corpus/build.d1 corpus/spec.d1
 echo "d1 dsl corpus OK"
