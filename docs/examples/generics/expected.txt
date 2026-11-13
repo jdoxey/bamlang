@@ -1,0 +1,44 @@
+== Part 1: algorithms over Employee ==
+sorted by dept, salary desc, name:
+  eng   Carol  90000
+  eng   Alice  70000
+  eng   Bob    70000
+  ops   Erin   55000
+  ops   Dave   45000
+  sales Grace  60000
+  sales Frank  40000
+  sales Heidi  40000
+min_by salary: Heidi 40000
+max_by salary: Carol 90000
+group_by dept:
+  eng   count=3 total=230000
+  ops   count=2 total=100000
+  sales count=3 total=140000
+salary > 50000: [Grace Bob Carol Alice Erin]
+== Part 2: LRU cache reused for two key/value pairs ==
+profiles put 1/1
+profiles put 1/2
+profiles get 1/1 hit Ann <ann@example.com>
+profiles put 2/1
+profiles evict 1/2
+profiles get 1/2 miss
+profiles put 1/3
+profiles evict 1/1
+profiles get 2/1 hit Cy <cy@example.com>
+profiles get 1/1 miss
+queries put a
+queries put b
+queries put c
+queries get a hit [1]
+queries put d
+queries evict b
+queries get b miss
+queries put a
+queries put e
+queries evict c
+queries get c miss
+queries get a hit [1 1]
+== Part 3: Optional pipeline across a thread ==
+addr for 1: 10 Main St, Springfield
+addr for 2: none
+addr for 3: none
