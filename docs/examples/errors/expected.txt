@@ -1,0 +1,30 @@
+== part 1: config parser
+fail-fast: config.ini:4: missing '='
+collect-all:
+  config.ini:4: missing '='
+  config.ini:5: empty key
+  config.ini:6: duplicate key 'port' in [server]
+3 errors
+server.port = 8080
+timeout not set, using 30
+== part 2: replace_file
+start: content old
+run 1, no failure: ok
+  files: data.txt
+  content: v1
+run 2, fail at step 1: error: step 1: create lock: injected failure
+  files: data.txt
+  content: v1
+run 3, fail at step 2: error: step 2: write temp: injected failure
+  files: data.txt
+  content: v1
+run 4, fail at step 3: error: step 3: rename temp: injected failure
+  files: data.txt
+  content: v1
+run 5, fail at step 4: error: step 4: remove lock: injected failure
+  files: data.txt
+  content: v5
+== part 3: crew
+error: worker 2: config.ini:3: missing '=' (plus 1 more)
+mutex poisoned: yes
+expect_trap ok
