@@ -2,23 +2,21 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D5, types and OO (methods with implicit `self`, interfaces, inheritance).
-- **Decided:** ADR-0001 memory (owned values, moves, checked handles into pools), ADR-0002 containers (built-in `List of T` etc.; no user type parameters), ADR-0003 concurrency (scoped `crew` threads, no async), ADR-0004 errors (`fails`/`try` over `Result`, one `Error`, no null). Veto by opening an issue.
+- **Now:** D6, core syntax (statement endings without semicolons or indentation, blocks, declarations, naming) and the example corpus that becomes the syntax tests.
+- **Decided:** ADR-0001 memory, ADR-0002 containers, ADR-0003 concurrency (crews), ADR-0004 errors (`fails`/`try`, no null), ADR-0005 types (methods, `iface` + `dyn`, no inheritance). Veto by opening an issue.
 - **Needs you:** nothing. Issue #3 answered (yes); your mitigations are in ADR-0002.
 
 ## Next action
 
-Roadmap item **D5** (ADR-0005, Full). Inputs:
-- Charter P-PY ("passing self makes OO weird") and P-C ("no native OO support").
-- ADR-0001: owned values, pools and handles; methods on pool entries (implicit `self` is the borrowed entry); `take self`.
-- ADR-0002: user sum types with `match`, records of functions as the extension pattern, no user type parameters, derived `equals`/`hash`.
-- ADR-0004: `fails` methods.
-- Decide: methods and implicit `self`; interfaces (structural? nominal? dispatch cost and transparency); inheritance or not; constructors and visibility; enums and structs.
+Roadmap item **D6** (ADR-0006, Full). Inputs:
+- G4 (clean, non-verbose) and G5 (no significant whitespace, no mandatory semicolons).
+- Every ADR's "Syntax budget impact" section lists keywords and grammar to spell: `of`, `take`, `with`, `lock`, `crew`, `fails`, `try … or e`, `context`, `iface`, `impl`, `dyn`, `pub`, `is`, `match`, `enum`, receiver modes, field lists `.dept desc`, `if x = …`, named arguments with defaults (ADR-0005).
+- The pseudo-syntax files written so far are the raw material: `docs/examples/widgets/o9s.txt`, `generics/aplus/aplus.txt`, `threads/f1-crew/crew.txt`, `errors/merged/errors.txt`, `types/t3plus/types.txt`.
 
-1. Step 1: research (Go interfaces, Rust traits, Swift protocols, Java/Kotlin classes, Odin/Zig no-OO, Python self, C++ virtual, Objective-C), with what went wrong.
-2. Step 2: criteria first, then 6 sane and 4 crazy ideas, plus combinations.
-3. Step 3: write the top 3 as real code on a shapes/plugins/UI-widget benchmark, with `run.sh` on all three OSes. Model each design, not its host language (PROCESS lesson).
-4. Step 4: an Opus reviewer attacks the winner; scores by script; decide; ADR under 300 lines.
+1. Step 1: research how Go, Kotlin, Swift, Scala 3, Lua, Ruby, JavaScript (ASI) and Odin end statements without semicolons and without indentation, and what went wrong (ASI hazards, line continuation).
+2. Step 2: criteria first, then 6 sane and 4 crazy syntax options, plus combinations.
+3. Step 3: write the same corpus (at least chatsim, widgets and errors) in the top 3 syntaxes. Build a real parser for each finalist (for example a small recursive-descent parser in Python or Rust in `docs/examples/syntax/<option>/`) that parses the whole corpus in CI on three OSes. This is the "real code" for a syntax decision.
+4. Step 4: an Opus reviewer attacks the winner; scores by script; decide; ADR under 300 lines. The winning corpus becomes `tests/corpus/` for M0.
 
 ## Open questions carried forward
 
@@ -40,6 +38,7 @@ Nothing.
 
 - 2026-11-13: repo set up from the planning conversation.
 - 2026-11-13: first run on Sonnet skipped the real-examples step. John reset `main`; that work is on the `sonnet-attempt` branch for reference only.
+- 2026-11-13: ADR-0005 Accepted (T3+ after review and a loop-2 example).
 - 2026-11-13: ADR-0004 Accepted (merged E1 spelling over E2 values after one review loop). Issue #3 answered yes by John and closed.
 - 2026-11-13: ADR-0003 Accepted (a tie broken by the examples and reversibility after one review loop).
 - 2026-11-13: ADR-0002 Accepted after two review loops (a tie broken by the examples and reversibility). OCaml added to CI on Linux and macOS.

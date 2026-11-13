@@ -8,7 +8,7 @@ Work top to bottom. Tick an item when its ADR is Accepted or its milestone passe
 - [x] **D2 Generics and containers** (Full). ADR-0002 Accepted 2026-11-13: a frozen built-in set, no user type parameters (pending issue #3).
 - [x] **D3 Concurrency model** (Full). ADR-0003 Accepted 2026-11-13: scoped crews, owned channels, lock and blocking traps, no async.
 - [x] **D4 Errors and absence** (Full). ADR-0004 Accepted 2026-11-13: `fails`/`try` over `Result` values, one `Error`, no null, traps caught only at crews and tests.
-- [ ] **D5 Types and OO** (Full). Methods with implicit `self`, interfaces, and whether inheritance exists.
+- [x] **D5 Types and OO** (Full). ADR-0005 Accepted 2026-11-13: methods in types with receiver modes, nominal `iface` + `dyn`, provided functions, no inheritance.
 - [ ] **D6 Core syntax** (Full). Statement endings without semicolons or indentation rules (G5), blocks, declarations, naming. Produce a corpus of example programs that become the syntax tests.
 - [ ] **D7 DSL and declarative layout** (Full). The mechanism for G11 without macros or annotations.
 - [ ] **D8 Compiler implementation** (Full). Host language, backend, debug info (G8) and coverage (G9) on all three OSes.
