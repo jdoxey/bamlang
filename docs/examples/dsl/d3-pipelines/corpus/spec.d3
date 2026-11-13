@@ -1,40 +1,40 @@
 # Benchmark 3, a test suite (nested groups, shared setup) and an HTML page, D3.
 fn spec() -> Spec {
-  return Group("Stack")
-    .setup(fn() => Stack.new())
-    .add(Group("empty")
-      .add(Case("is empty", fn(s) => expect(s.is_empty())))
-      .add(Case("pop gives none", fn(s) => expect_eq(s.pop(), none)))
-      .add(Case("peek gives none", fn(s) => expect_eq(s.peek(), none))))
-    .add(Group("with three items")
-      .before(fn(s) { s.push(1); s.push(2); s.push(3) })
-      .add(Case("len is 3", fn(s) => expect_eq(s.len(), 3)))
-      .add(Case("pop gives the last pushed", fn(s) => expect_eq(s.pop(), some(3))))
-      .add(Group("after one pop")
-        .before(fn(s) { s.pop() })
-        .add(Case("len is 2", fn(s) => expect_eq(s.len(), 2)))
-        .add(Case("peek gives 2", fn(s) => expect_eq(s.peek(), some(2)))))
-      .add(Case("clear empties", fn(s) { s.clear(); expect(s.is_empty()) })))
-    .add(Group("push many")
-      .add_each([1, 10, 1000], fn(n) => Case("len after {n} pushes", fn(s) {
-        for i in 0..n { s.push(i) }
-        expect_eq(s.len(), n)
+  return Group(name: "Stack")
+    .setup(run: fn() => Stack.new())
+    .add(kid: Group(name: "empty")
+      .add(kid: Case(name: "is empty", body: fn(s) => expect(ok: s.is_empty())))
+      .add(kid: Case(name: "pop gives none", body: fn(s) => expect_eq(actual: s.pop(), expected: none)))
+      .add(kid: Case(name: "peek gives none", body: fn(s) => expect_eq(actual: s.peek(), expected: none))))
+    .add(kid: Group(name: "with three items")
+      .before(run: fn(s) { s.push(item: 1); s.push(item: 2); s.push(item: 3) })
+      .add(kid: Case(name: "len is 3", body: fn(s) => expect_eq(actual: s.len(), expected: 3)))
+      .add(kid: Case(name: "pop gives the last pushed", body: fn(s) => expect_eq(actual: s.pop(), expected: some(value: 3))))
+      .add(kid: Group(name: "after one pop")
+        .before(run: fn(s) { s.pop() })
+        .add(kid: Case(name: "len is 2", body: fn(s) => expect_eq(actual: s.len(), expected: 2)))
+        .add(kid: Case(name: "peek gives 2", body: fn(s) => expect_eq(actual: s.peek(), expected: some(value: 2)))))
+      .add(kid: Case(name: "clear empties", body: fn(s) { s.clear(); expect(ok: s.is_empty()) })))
+    .add(kid: Group(name: "push many")
+      .add_each(items: [1, 10, 1000], build: fn(n) => Case(name: "len after {n} pushes", body: fn(s) {
+        for i in 0..n { s.push(item: i) }
+        expect_eq(actual: s.len(), expected: n)
       })))
 }
 
-const LINKS = [Link("Home", "/"), Link("Stock", "/stock"), Link("About", "/about")]
+const LINKS = [Link(label: "Home", url: "/"), Link(label: "Stock", url: "/stock"), Link(label: "About", url: "/about")]
 
 fn page(heading: Str, rows: List of Row) -> Html {
-  let nav = Nav().children_of(LINKS, fn(l) => A(l.label).href(l.url))
-  let head_row = Tr().children_of(["Name", "Qty", "Price"], fn(h) => Th(h))
+  let nav = Nav().children_of(items: LINKS, build: fn(l) => A(label: l.label).href(url: l.url))
+  let head_row = Tr().children_of(items: ["Name", "Qty", "Price"], build: fn(h) => Th(text: h))
   let table = Table()
-    .child(head_row)
-    .child_if(rows.is_empty(), Tr().child(Td("no rows").colspan(3)))
-    .children_of(rows, fn(r) => Tr()
-      .child(Td(r.name))
-      .child(Td("{r.qty}").align(Align.Right))
-      .child(Td("{r.price:.2}").align(Align.Right)))
+    .child(node: head_row)
+    .child_if(cond: rows.is_empty(), node: Tr().child(node: Td(text: "no rows").colspan(count: 3)))
+    .children_of(items: rows, build: fn(r) => Tr()
+      .child(node: Td(text: r.name))
+      .child(node: Td(text: "{r.qty}").align(side: Align.Right))
+      .child(node: Td(text: "{r.price:.2}").align(side: Align.Right)))
   return Html()
-    .child(Head().child(Title(heading)))
-    .child(Body().child(nav).child(H1(heading)).child(table))
+    .child(node: Head().child(node: Title(text: heading)))
+    .child(node: Body().child(node: nav).child(node: H1(text: heading)).child(node: table))
 }

@@ -1,4 +1,4 @@
 # expect: 3: mismatched
 fn f() -> Node {
-  return Column().child(Text("x")))
+  return Column().child(node: Text(content: "x")))
 }

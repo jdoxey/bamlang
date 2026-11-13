@@ -9,10 +9,10 @@ type Todo {
 enum Filter { All, Active, Done }
 
 enum Msg {
-  Add(Str)
-  Toggle(Int)
-  Delete(Int)
-  SetFilter(Filter)
+  Add(title: Str)
+  Toggle(id: Int)
+  Delete(id: Int)
+  SetFilter(filter: Filter)
   ClearDone
 }
 
@@ -33,8 +33,8 @@ fn label_of(f: Filter) -> Str {
 fn visible(m: Model) -> List of Todo {
   return match m.filter {
     All => m.items,
-    Active => m.items.filter(fn(t) => not t.done),
-    Done => m.items.filter(fn(t) => t.done),
+    Active => m.items.filter(keep: fn(t) => not t.done),
+    Done => m.items.filter(keep: fn(t) => t.done),
   }
 }
 
@@ -44,50 +44,50 @@ type Node {
   key: Str = ""
   kids: List of Node = []
 
-  fn gap(take self, n: Int) -> Node { self.gap = n; return self }
-  fn child(take self, c: Node) -> Node { self.kids.push(c); return self }
-  fn child_if(take self, cond: Bool, c: Node) -> Node {
-    if cond { self.kids.push(c) }
+  fn gap(take self, size: Int) -> Node { self.gap = size; return self }
+  fn child(take self, node: Node) -> Node { self.kids.push(item: node); return self }
+  fn child_if(take self, cond: Bool, node: Node) -> Node {
+    if cond { self.kids.push(item: node) }
     return self
   }
-  fn children_of(take self, xs: List of T, f: fn(T) -> Node) -> Node {
-    for x in xs { self.kids.push(f(x)) }
+  fn children_of(take self, items: List of T, build: fn(item: T) -> Node) -> Node {
+    for item in items { self.kids.push(item: build(item)) }
     return self
   }
 }
 
 fn view(m: Model, ui: Ui) -> Node {
-  let draft = ui.slot("draft", "")
+  let draft = ui.slot(name: "draft", initial: "")
   let shown = visible(m)
   let tabs = Row()
-    .gap(2)
-    .children_of([Filter.All, Filter.Active, Filter.Done], fn(f) => Button(label_of(f))
-      .key("tab-{f}")
-      .active(m.filter == f)
-      .on_click(Msg.SetFilter(f)))
+    .gap(size: 2)
+    .children_of(items: [Filter.All, Filter.Active, Filter.Done], build: fn(f) => Button(label: label_of(f))
+      .key(name: "tab-{f}")
+      .active(state: m.filter == f)
+      .on_click(msg: Msg.SetFilter(filter: f)))
   return Column()
-    .gap(8)
-    .child(Text("Todos").style(Style.Title))
-    .child(Row()
-      .gap(4)
-      .child(Input().key("draft").slot(draft).placeholder("What needs doing?").on_enter(Msg.Add(draft.get())))
-      .child(Button("Add").on_click(Msg.Add(draft.get()))))
-    .child(tabs)
-    .child_if(shown.is_empty(), Text("Nothing to do").style(Style.Dim))
-    .children_of(shown, fn(t) => Row()
-      .key("todo-{t.id}")
-      .gap(4)
-      .child(Checkbox().checked(t.done).on_toggle(Msg.Toggle(t.id)))
-      .child(Text(t.title).style(if t.done { Style.Struck } else { Style.Normal }))
-      .child(Button("x").on_click(Msg.Delete(t.id))))
-    .child_if(m.items.any(fn(t) => t.done), Button("Clear completed").on_click(Msg.ClearDone))
+    .gap(size: 8)
+    .child(node: Text(content: "Todos").style(kind: Style.Title))
+    .child(node: Row()
+      .gap(size: 4)
+      .child(node: Input().key(name: "draft").slot(slot: draft).placeholder(text: "What needs doing?").on_enter(msg: Msg.Add(title: draft.get())))
+      .child(node: Button(label: "Add").on_click(msg: Msg.Add(title: draft.get()))))
+    .child(node: tabs)
+    .child_if(cond: shown.is_empty(), node: Text(content: "Nothing to do").style(kind: Style.Dim))
+    .children_of(items: shown, build: fn(t) => Row()
+      .key(name: "todo-{t.id}")
+      .gap(size: 4)
+      .child(node: Checkbox().checked(state: t.done).on_toggle(msg: Msg.Toggle(id: t.id)))
+      .child(node: Text(content: t.title).style(kind: if t.done { Style.Struck } else { Style.Normal }))
+      .child(node: Button(label: "x").on_click(msg: Msg.Delete(id: t.id))))
+    .child_if(cond: m.items.any(test: fn(t) => t.done), node: Button(label: "Clear completed").on_click(msg: Msg.ClearDone))
 }
 
 fn update(mut m: Model, msg: Msg) {
   match msg {
     Add(title) => {
       if title != "" {
-        m.items.push(Todo(id: m.next_id, title: title, done: false))
+        m.items.push(item: Todo(id: m.next_id, title, done: false))
         m.next_id += 1
       }
     },
@@ -96,8 +96,8 @@ fn update(mut m: Model, msg: Msg) {
         if t.id == id { t.done = not t.done }
       }
     },
-    Delete(id) => { m.items.retain(fn(t) => t.id != id) },
+    Delete(id) => { m.items.retain(keep: fn(t) => t.id != id) },
     SetFilter(f) => { m.filter = f },
-    ClearDone => { m.items.retain(fn(t) => not t.done) },
+    ClearDone => { m.items.retain(keep: fn(t) => not t.done) },
   }
 }

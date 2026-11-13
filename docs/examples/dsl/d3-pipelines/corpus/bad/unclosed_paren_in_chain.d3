@@ -1,6 +1,6 @@
 # expect: 4: unclosed `(` from line 4
 fn f() -> Node {
   return Column()
-    .child(Row().child(Text("x"))
-    .child(Text("y"))
+    .child(node: Row().child(node: Text(content: "x"))
+    .child(node: Text(content: "y"))
 }

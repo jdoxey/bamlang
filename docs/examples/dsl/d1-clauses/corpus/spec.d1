@@ -2,45 +2,45 @@
 fn spec() -> Spec {
   return Group(name: "Stack", setup: fn() => Stack.new(), kids: [
     Group(name: "empty", kids: [
-      Case("is empty", fn(s) => expect(s.is_empty())),
-      Case("pop gives none", fn(s) => expect_eq(s.pop(), none)),
-      Case("peek gives none", fn(s) => expect_eq(s.peek(), none)),
+      Case(name: "is empty", body: fn(s) => expect(ok: s.is_empty())),
+      Case(name: "pop gives none", body: fn(s) => expect_eq(actual: s.pop(), expected: none)),
+      Case(name: "peek gives none", body: fn(s) => expect_eq(actual: s.peek(), expected: none)),
     ]),
-    Group(name: "with three items", before: fn(s) { s.push(1); s.push(2); s.push(3) }, kids: [
-      Case("len is 3", fn(s) => expect_eq(s.len(), 3)),
-      Case("pop gives the last pushed", fn(s) => expect_eq(s.pop(), some(3))),
+    Group(name: "with three items", before: fn(s) { s.push(item: 1); s.push(item: 2); s.push(item: 3) }, kids: [
+      Case(name: "len is 3", body: fn(s) => expect_eq(actual: s.len(), expected: 3)),
+      Case(name: "pop gives the last pushed", body: fn(s) => expect_eq(actual: s.pop(), expected: some(value: 3))),
       Group(name: "after one pop", before: fn(s) { s.pop() }, kids: [
-        Case("len is 2", fn(s) => expect_eq(s.len(), 2)),
-        Case("peek gives 2", fn(s) => expect_eq(s.peek(), some(2))),
+        Case(name: "len is 2", body: fn(s) => expect_eq(actual: s.len(), expected: 2)),
+        Case(name: "peek gives 2", body: fn(s) => expect_eq(actual: s.peek(), expected: some(value: 2))),
       ]),
-      Case("clear empties", fn(s) { s.clear(); expect(s.is_empty()) }),
+      Case(name: "clear empties", body: fn(s) { s.clear(); expect(ok: s.is_empty()) }),
     ]),
     Group(name: "push many", kids: [
-      for n in [1, 10, 1000] => Case("len after {n} pushes", fn(s) {
-        for i in 0..n { s.push(i) }
-        expect_eq(s.len(), n)
+      for n in [1, 10, 1000] => Case(name: "len after {n} pushes", body: fn(s) {
+        for i in 0..n { s.push(item: i) }
+        expect_eq(actual: s.len(), expected: n)
       }),
     ]),
   ])
 }
 
-const LINKS = [Link("Home", "/"), Link("Stock", "/stock"), Link("About", "/about")]
+const LINKS = [Link(label: "Home", url: "/"), Link(label: "Stock", url: "/stock"), Link(label: "About", url: "/about")]
 
 fn page(heading: Str, rows: List of Row) -> Html {
   return Html(kids: [
-    Head(kids: [Title(heading)]),
+    Head(kids: [Title(text: heading)]),
     Body(kids: [
       Nav(kids: [
-        for l in LINKS => A(l.label, href: l.url),
+        for l in LINKS => A(label: l.label, href: l.url),
       ]),
-      H1(heading),
+      H1(text: heading),
       Table(kids: [
-        Tr(kids: [for h in ["Name", "Qty", "Price"] => Th(h)]),
-        if rows.is_empty() => Tr(kids: [Td("no rows", colspan: 3)]),
+        Tr(kids: [for h in ["Name", "Qty", "Price"] => Th(text: h)]),
+        if rows.is_empty() => Tr(kids: [Td(text: "no rows", colspan: 3)]),
         for r in rows => Tr(kids: [
-          Td(r.name),
-          Td("{r.qty}", align: Align.Right),
-          Td("{r.price:.2}", align: Align.Right),
+          Td(text: r.name),
+          Td(text: "{r.qty}", align: Align.Right),
+          Td(text: "{r.price:.2}", align: Align.Right),
         ]),
       ]),
     ]),

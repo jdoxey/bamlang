@@ -1,4 +1,5 @@
 # D2 variadic last parameter + clauses as arguments: notes
+**RULED OUT by ADR-0006 amendment 1 (named arguments).** Variadics are gone and positional items after named arguments are not allowed, so D2 cannot exist under the amended syntax. This directory is frozen on old P3 (its parser, corpus and numbers are the record); `run.sh` still passes against `../../syntax/p3`. Do not rebase it.
 `sh run.sh` prints "d2 dsl corpus OK": todo, build, spec, edge parse; 9 bad files match; P3 corpus unchanged.
 **Parser diff vs p3:** +75/-4 lines (1004 -> 1075); +36 over D1. Lexer: a `...` token. `param()`/`params()`: `name: T...`
 (flag `variadic`; must be last, no default, needs a type). `args()` rewritten to collect items; `item_arg()` new.

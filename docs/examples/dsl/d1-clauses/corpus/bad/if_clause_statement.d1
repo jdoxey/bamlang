@@ -1,4 +1,4 @@
 # expect: 3: only allowed as an item directly inside
 fn f(ok: Bool) {
-  if ok => print("hi")
+  if ok => print(text: "hi")
 }

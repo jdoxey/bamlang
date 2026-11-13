@@ -1,7 +1,7 @@
 # expect: 6: line starts with `.` after `}`
 fn f(ok: Bool) -> Node {
   if ok {
-    log("x")
+    log(text: "x")
   }
-    .child(Text("x"))
+    .child(node: Text(content: "x"))
 }
