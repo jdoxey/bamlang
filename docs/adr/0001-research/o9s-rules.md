@@ -47,3 +47,27 @@ These are the decisions on each finding in `review-o9.md`. They define what the 
   the exit report, not prevented.
 - Functions can't return borrows, so getters return copies or handles (F10).
 - `.copy()` will be common on strings (F7). The second example counts how common.
+
+## Refinements after the `widgets` example (`docs/examples/widgets/NOTES.md`)
+
+The C model and its writer found eight gaps. These are the decisions.
+
+1. **Shared and mutable borrows.** `if w = pool.get(h)` borrows shared, unless the block writes through `w`; the compiler
+   infers which from the block. Any number of shared borrows may coexist. A write to an entry while any other borrow of
+   it is live traps. This is what lets the dispatcher read a button while its callback also reads it.
+2. **Writes through `pool[h].f = x` are checked too.** A callback replacing its own running `onClick` therefore traps
+   (it would otherwise free the running closure). The fix is to set a flag and replace it after the call.
+3. **Removing a borrowed owner.** `remove(h)` stales `h` and its whole owned subtree at once. The drops run when the last
+   borrow inside the subtree ends.
+4. **Drop order.** The owner's `drop` runs first, then the owned entries in creation order. The cascade uses a work list,
+   not recursion, so deep trees can't overflow the stack.
+5. **Absent handles** are `Handle of T` inside the optional type that D4 defines. Until D4, write `none`.
+6. **Iterating a pool.** `pool.handles()` returns a new `List` (a visible copy). Iterating it while adding or removing is
+   allowed.
+7. **Wrong pool of the same type** is a run-time trap only (the pool id check). This is accepted.
+8. **`with w = pool[h] { … }`** is a block borrow that traps on a stale handle, instead of the `else` branch that can't
+   happen. Five of the seven `else` branches in widgets were of that kind.
+
+Measured in `o9s.txt` (280 lines): 7 `.copy()` calls, 7 stale branches (2 reachable), and 3 deferred drops in the script.
+Cross-pool cleanup (cache release, unsubscribe) is written by hand in `drop`, and nothing prompts for it. A shared
+image cache needs a hand-kept use count; the model has no shared ownership, by design.

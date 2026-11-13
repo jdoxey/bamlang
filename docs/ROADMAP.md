@@ -4,7 +4,7 @@ Work top to bottom. Tick an item when its ADR is Accepted or its milestone passe
 
 ## Phase 1: decisions
 
-- [ ] **D1 Memory model** (ADR-0001, Full). In progress; see `docs/STATE.md`.
+- [x] **D1 Memory model** (ADR-0001, Full). Accepted 2026-11-13: O9-S, owned values plus checked handles into pools.
 - [ ] **D2 Generics and containers** (Full). How typed `List`/`Map` exist under G3. Is memory safety a stated goal?
 - [ ] **D3 Concurrency model** (Full). Threads are in v1 (R1). What crosses threads, and how is shared state guarded?
 - [ ] **D4 Errors and absence** (Full). Exceptions, results or error values. Whether anything can be null.

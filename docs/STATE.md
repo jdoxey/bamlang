@@ -2,37 +2,30 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** ADR-0001 (memory model): O9, owned values plus checked handles into pools, leads 85 to 71 after real code in C, Swift and Rust. A reviewer is attacking it before acceptance.
-- **Decided so far:** nothing final. Your rulings are in `docs/RULINGS.md`.
+- **Now:** D2, generics and containers (how `List`, `Map`, `Pool` exist under G3). Research done; criteria and ideas next.
+- **Decided:** ADR-0001 memory model, Accepted: owned values, moves, explicit `.copy()`, and checked handles into pools. No reference counting, no `weak`. Veto by opening an issue.
 - **Needs you:** nothing. To steer or veto, open a GitHub issue.
 
 ## Next action
 
-Roadmap item **D1**, step 3 of the process: real examples.
+Roadmap item **D2** (ADR-0002, Full). Step 1 research is in `docs/adr/0002-research/research.md`.
 
-1. ~~Write `chatsim` in C from `docs/examples/chatsim/SPEC.md`. Put it in `docs/examples/chatsim/c/` with a `run.sh` that builds it and runs a script hitting every listed case. CI runs every `run.sh` on Linux, Windows and macOS, so use portable threads (Windows has no pthreads). Locally, also run it under AddressSanitizer.~~ Done 2026-11-13: `docs/examples/chatsim/c/`, green on all three OSes; clean under ASan, UBSan, LSan and TSan.
-2. ~~Write its `room` and `user` parts in three models, in the closest real language, and run the same script:
-   - **O1 pure ARC:** Swift (issue #1). An earlier C++ `shared_ptr` port was replaced.
-   - **O4 simplified ownership:** Rust, using moves plus `Rc` only where forced.
-   - **O9 owned values plus pool handles:** C with a generation-checked slot map.~~ Done: `o1-cpp/`, `o4-rust/`, `o9-c/`, green on all three OSes.
-3. ~~Record what each taught, against the cases in `docs/adr/0001-research/memory-cases.md`. Pay most attention to cases 12, 14, 20 and 25.~~ Done: `0001-research/chatsim-lessons.md`.
-4. ~~Add a run-time transparency criterion (R6) to the rubric, re-score O1, O4 and O9,~~ (O9 85, O4 71, O1 70; `rubric-v2.md`); **reviewer attack on O9 running now**, and have a separate reviewer attack the winner.
-5. Decide. Rewrite `docs/adr/0001-memory-management.md` down to under 300 lines with Status "Accepted", moving the history into `0001-research/`.
+1. Step 2: write criteria (include R6 transparency), then ideas: at least 6 sane, 4 crazy, and combinations. ADR-0001 needs `Pool of T`, `Handle of T`, `List of T`, `Map of K to V`, `Mutex of T`, `Channel of T` and an optional type to exist.
+2. Step 3: write the three test programs from the research (generic sort with a user comparator, an LRU cache used for two key/value pairs, an `Optional` pipeline) in the closest real languages for the top 3 options, as `docs/examples/generics/<option>/` with `run.sh`.
+3. Step 4: separate Opus reviewer attacks the winner; score; decide; ADR under 300 lines.
 
 Then continue down `docs/ROADMAP.md`.
 
-## Open questions inside ADR-0001 (decide them as part of D1 or the item named)
+## Open questions carried forward
 
-- **P2, built-in generic containers under G3:** decide in D2.
-- **P3, is memory safety required:** R6 says "more helpful and safe than C". Decide in D1.
-- **Q5, weights:** set them yourself from the charter and rulings.
-- **Q11, closures and `self`**, and **Q14, implicit or explicit copies:** decide in D1.
+- **P2, built-in parameterised types under G3:** decide in D2.
 - **Q15, is G11 syntax only:** decide in D7. Until then, assume syntax only for v1.
+- From ADR-0001: D3 must define channels, `Mutex of T` and the main-thread rule; D4 optional handles and traps; D5 methods on pool entries.
 
 ## Environment
 
 - This machine runs Debian 13. Installed: `build-essential`, `clang` 19, `llvm-dev` 19, `lld`, `lldb`, `gdb`, `valgrind`, `cmake`, `ninja`, `go`, `swiftlang` 6.0.3, `rustc`/`cargo` 1.100, `jq`, `gh`. There is no `sudo` in the session. If a decision needs a missing tool (for example Zig or Kotlin), list it under Blocked with the exact install command and carry on with other work.
-- CI runs `ci/run.sh` on `ubuntu-24.04`, `windows-2025` and `macos-26`. Keep all three green. If a runner label stops working, look up the current one and update `ci.yml`.
+- CI runs `ci/run.sh` on `ubuntu-24.04`, `windows-2025` and `macos-26`. Keep all three green. Windows has MinGW gcc/g++ and Rust but no Swift; Swift examples skip there and say so.
 - A hook pauses the session at 85% of the account's usage. A long pause before a tool call is that hook, not a fault.
 
 ## Blocked
@@ -42,5 +35,5 @@ Nothing.
 ## Log
 
 - 2026-11-13: repo set up from the planning conversation.
-- 2026-11-13: chatsim C reference, `script.txt` and `expected.txt` committed. Ports O1/O4/O9 in progress.
-- 2026-11-13: first run on Sonnet skipped the real-examples step. John reset `main`; that work is on the `sonnet-attempt` branch for reference only. Don't merge it or treat its ADRs as decided.
+- 2026-11-13: first run on Sonnet skipped the real-examples step. John reset `main`; that work is on the `sonnet-attempt` branch for reference only.
+- 2026-11-13: chatsim in C, Swift (O1), Rust (O4) and C (O9); widgets under O9-S. Opus review found a fatal hole in O9, fixed as O9-S. ADR-0001 Accepted. Issues #1 and #2 handled and closed.
