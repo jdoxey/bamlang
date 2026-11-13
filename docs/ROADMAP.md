@@ -12,7 +12,7 @@ Work top to bottom. Tick an item when its ADR is Accepted or its milestone passe
 - [x] **D6 Core syntax** (Full). ADR-0006 Accepted 2026-11-13: newline-terminated, only brackets or a leading `.` continue; braces; `Name(field: v)`; corpus and parser in `docs/examples/syntax/p3/`.
 - [x] **D7 DSL and declarative layout** (Full). ADR-0007 Accepted 2026-11-14: `if`/`for` clause items in list literals, one desugaring; DSL libraries in the stdlib dialect; examples in `docs/examples/dsl/`.
 - [x] **D8 Compiler implementation** (Full). ADR-0008 Accepted 2026-11-14: Rust (no third-party crates) emitting C for clang; setjmp cleanup-stack traps; gdb/lldb/cdb proven in CI; coverage remapped to `.p3`. Spikes in `docs/examples/compiler/`.
-- [ ] **D9 Modules, build and dependencies** (Full). Dependencies are git repos (G7); lockfile and reproducibility.
+- [x] **D9 Modules, build and dependencies** (Full). ADR-0009 Accepted 2026-11-14: path imports, MVS with the full build list in `project.toml`, `deps.sum` over git objects, no build scripts, C libraries as data, toolchain-only generic dialect; system clang interim. Prototypes in `docs/examples/build/deps/`.
 - [ ] **D10 Standard library v1 scope** (Light). Lists, arrays, time, calendar and what else (G6).
 - [ ] **D11 Testing, coverage and debugger tooling** (Light). G8–G10.
 - [ ] **D12 Language name and file extension** (Light). Propose 5; pick one; John can veto.

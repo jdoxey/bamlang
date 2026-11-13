@@ -2,17 +2,19 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D9 loop 2 (dependencies): fixing the review's findings in the B1 (Go-style) and B2 (pinned) prototypes.
-- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes). Veto by opening an issue.
+- **Now:** D10, standard library v1 scope (Light).
+- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes), 0009 dependencies (git paths, MVS, hashed, no build scripts). Veto by opening an issue.
 - **Needs you (optional yes/no):** may CI download a SHA-pinned llvm-mingw (182 MB) to test replacing the 6–7 GB Visual Studio Build Tools on Windows? I recommend yes. Until then the default is system clang (D9 records it as interim).
 
 ## Next action
 
-1. `docs/PLAN.md` is done.
-2. D9 (ADR-0009, Full): modules, build and dependencies (G7). Inputs:
-   - ADR-0002: the generic dialect is allowed only in the stdlib and `extras`.
-   - ADR-0005: whole-program `dyn` link check.
-   - ADR-0008: clang is required. Decide whether to bundle clang and lld or require them per OS. FFI: traps never cross C frames, and extern declarations name every parameter (ADR-0006 amendment 1).
+**D10** (ADR-0010, Light: one pass, no subagents, ADR under 60 lines). Inputs that earlier ADRs passed on:
+- ADR-0002 owner answer: the container quality bar (benchmarks against C++ and Rust equivalents, docs, conformance tests); the `extras` repo.
+- ADR-0004: the closed `Error` kind enum, `Report`, `Txn`, `replace`, `try_alloc`.
+- ADR-0007: UI, HTML, build and test libraries (`docs/examples/dsl/lib/`): which ship in v1.
+- ADR-0008: debugger formatters for List, Map, Handle and enums.
+- G6: Lists, Arrays, Maps, time, calendar.
+Then D11 (testing, coverage, debugger tooling; Light) and D12 (name; Light), then M0.
 
 ## Open questions carried forward
 
@@ -31,6 +33,8 @@
 - **D9 toolchain spike (T2 llvm-mingw, T3 zig cc on Windows):** the session's permission check denied an agent that would download and run third-party toolchain binaries in CI. Not retried. T1 (system clang, already green on all three OSes in ADR-0008's CI) is the v1 default until John allows the downloads; see ADR-0009.
 
 ## Log
+
+- 2026-11-14: D9 done (ADR-0009 Accepted after two loops; B1+ over B2+ on the major-break scenario).
 
 - 2026-11-14: D8 done (ADR-0008 Accepted after two loops; K3 Rust to C won once cdb ran on Windows).
 

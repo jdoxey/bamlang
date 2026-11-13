@@ -63,10 +63,12 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
 - **A script that checks a rewrite must be attacked too.** In amendment 1 the meaning check accepted wrong labels and capturing renames until the reviewer probed it. Give every checker its own false-accept tests.
 - **Always build the do-nothing baseline as a finalist.** In ADR-0007 it was named "the baseline to beat" but only built after the review, and it tied. Also have the examples declare every library signature they call, because undeclared libraries hid a fatal typing gap.
 - **Run the real tool on every OS before scoring.** In ADR-0008 the pre-review leader (K1) lost after cdb ran on Windows: its debug info was wrong under the Win64 ABI, and a PDB type dump had hidden it. A file dump is not a debugger session.
+- **Attack the shared helper, not just the winner.** In ADR-0009 most of the review's fatal findings were in `common.py`, which all three finalists shared, so the scores had overrated all of them equally.
 - **A GUI example is too big.** Use a small scripted simulation that has the same lifetimes (see `docs/examples/chatsim/SPEC.md`).
 
 ## Changelog
 
+- 2026-11-14: lesson from ADR-0009's retro (shared helpers).
 - 2026-11-14: lesson from ADR-0008's retro (real debugger sessions on every OS).
 - 2026-11-14: lesson from ADR-0007's retro (build the baseline; declare library signatures).
 - 2026-11-14: lesson from ADR-0006 amendment 1 (attack the checkers).

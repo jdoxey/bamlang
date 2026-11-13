@@ -28,3 +28,9 @@ local git repos. CI 43493656506 is green on Linux, Windows Git Bash and macOS. R
 
 **B1 and B2 tie** (a gap of 4). The examples break it for B1, because B2 can't build the major-break scenario and
 costs extra commands per diamond. Install is scored equal because the Windows toolchain spike is blocked (STATE).
+
+## Loop 2 (B1+ against B2+)
+
+- **Scores:** 76 against 73, a tie, broken by the examples (S4, and the number of commands). Details are in ADR-0009.
+- **macOS:** Mach-O prefixes C symbols with `_`, so the duplicate-symbol check failed there until names were
+  normalised (CI 43498805004). Platform naming belongs in the toolchain layer, not in the manifest.

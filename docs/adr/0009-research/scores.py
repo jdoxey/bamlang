@@ -13,6 +13,11 @@ S = {
     "B2 (review)": dict(simple=3.5, repro=4, transp=4.5, install=2.5, ffi=2.5, eco=2.5, impl=4.5),
     "B3 (review)": dict(simple=3, repro=3.5, transp=3.5, install=2.5, ffi=2.5, eco=3.5, impl=3),
     "B1+ (projected)": dict(simple=3.5, repro=4.5, transp=4.5, install=2.5, ffi=3, eco=3.5, impl=3.5),
+    # loop 2 (measured): both pass every review regression; real C library built on three OSes; B1+ builds S4 and needs
+    # fewer commands on diamonds and upgrades; B2+ errors on any two-major or v0 diamond. Shared code counted once:
+    # B1+ 1181 lines, B2+ 1158.
+    "B1+ loop 2": dict(simple=3.5, repro=4.5, transp=4.5, install=2.5, ffi=4, eco=4, impl=3.5),
+    "B2+ loop 2": dict(simple=3.5, repro=4.5, transp=4.5, install=2.5, ffi=4, eco=2.5, impl=3.5),
 }
 def total(s, w=W): return sum(s[k] * w[k] / 5 for k in w)
 for n, s in sorted(S.items(), key=lambda x: -total(x[1])): print(f"{total(s):5.1f}  {n}")
