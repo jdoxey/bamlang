@@ -1,0 +1,8 @@
+area 24
+big
+drop level 0
+drop level 1
+drop level 2
+drop outer
+trapped: bottom reached
+after trap
