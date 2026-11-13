@@ -42,3 +42,25 @@ The subset covers only what `spike.p3` uses:
   - what the debugger shows *without* custom formatters;
   - what each OS needed;
   - how traps unwind, and their cost on the non-trap path.
+
+## Loop 2 (after `docs/adr/0008-research/review-k1.md`)
+
+Two more programs: `spike2.p3` (expected `expected2.txt`) and `uncaught.p3`.
+
+- **`spike2.p3`:**
+  - **Enum (S1).** It has an enum value in the debugger. Break in `describe` at `let probe = 0` and show `s` as the Rect
+    variant with `w = 3`, `h = 4`. Use gdb on Linux, lldb on macOS, and the best available debugger on Windows. Use an
+    encoding that every debugger shows: a tag plus a union of variant structs, unless variant parts work in all
+    three.
+  - **Trap in a drop (F1).** The first trap's message comes first; the later one is appended as `; then: <message>`.
+    Every remaining drop still runs.
+  - **Crew trap (F3).** `crew c { c.go(task: …) }` runs each task on its own OS thread and joins at the brace. A trap
+    in a child is caught at the child's entry, stored, and re-raised in the parent after the join, where
+    `expect_trap` catches it. Trap state is thread-local.
+- **`uncaught.p3`:**
+  - Exits non-zero.
+  - `before` is on stdout, even when stdout is a pipe.
+  - stderr contains `trap: boom` and a trace line that names `inner`, or `spike` source line 4.
+- **Coverage (F4):** real LLVM source-based coverage, or for C a remap through `#line`. The report is against the
+  `.p3` file, with line and branch counts, on all three OSes.
+- **Versions (S3):** print `clang --version` on each runner. Emit a target triple and datalayout (LLVM IR options).

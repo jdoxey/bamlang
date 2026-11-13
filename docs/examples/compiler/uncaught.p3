@@ -1,0 +1,11 @@
+# An uncaught trap: stdout printed before it must survive, and the trap must abort with a message and trace on stderr.
+
+fn inner() {
+  trap(text: "boom")
+}
+
+fn main() {
+  print(text: "before")
+  inner()
+  print(text: "never")
+}

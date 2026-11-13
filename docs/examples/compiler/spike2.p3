@@ -1,0 +1,58 @@
+# D8 loop-2 spike program: enums in the debugger, a trap inside a drop, a trap in a crew child.
+
+enum Shape {
+  Circle(r: Int),
+  Rect(w: Int, h: Int),
+}
+
+type Guard {
+  name: Str,
+  drop(mut self) {
+    print(text: "drop {self.name}")
+  }
+}
+
+type Bad {
+  name: Str,
+  drop(mut self) {
+    print(text: "drop {self.name}")
+    trap(text: "trap in drop")
+  }
+}
+
+fn describe(s: Shape) -> Int {
+  let probe = 0
+  return match s {
+    Circle(r) => r * r * 3,
+    Rect(w, h) => w * h + probe,
+  }
+}
+
+fn drops_with_trap() {
+  let outer = Guard(name: "outer guard")
+  let bad = Bad(name: "bad")
+  let inner = Guard(name: "inner guard")
+  trap(text: "first")
+}
+
+fn child(n: Int) {
+  if n == 2 {
+    let g = Guard(name: "child {n}")
+    trap(text: "child {n} failed")
+  }
+}
+
+fn main() {
+  let a = describe(s: Shape.Rect(w: 3, h: 4))
+  print(text: "rect {a}")
+  expect_trap(action: fn() {
+    drops_with_trap()
+  })
+  expect_trap(action: fn() {
+    crew c {
+      c.go(task: fn() { child(n: 1) })
+      c.go(task: fn() { child(n: 2) })
+    }
+  })
+  print(text: "done")
+}

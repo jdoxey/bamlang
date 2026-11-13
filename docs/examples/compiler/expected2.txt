@@ -1,0 +1,8 @@
+rect 12
+drop inner guard
+drop bad
+drop outer guard
+trapped: first; then: trap in drop
+drop child 2
+trapped: child 2 failed
+done
