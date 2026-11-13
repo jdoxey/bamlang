@@ -1,0 +1,103 @@
+# Benchmark 1, todo UI, D3 (builder pipelines: leading-dot chains, no grammar change). Nodes are values; setters take
+# self and return it; `child_if` and `children_of` carry the control flow.
+type Todo {
+  id: Int
+  title: Str
+  done: Bool
+}
+
+enum Filter { All, Active, Done }
+
+enum Msg {
+  Add(Str)
+  Toggle(Int)
+  Delete(Int)
+  SetFilter(Filter)
+  ClearDone
+}
+
+type Model {
+  items: List of Todo = []
+  filter: Filter = Filter.All
+  next_id: Int = 1
+}
+
+fn label_of(f: Filter) -> Str {
+  return match f {
+    All => "All",
+    Active => "Active",
+    Done => "Done",
+  }
+}
+
+fn visible(m: Model) -> List of Todo {
+  return match m.filter {
+    All => m.items,
+    Active => m.items.filter(fn(t) => not t.done),
+    Done => m.items.filter(fn(t) => t.done),
+  }
+}
+
+type Node {
+  tag: Str
+  gap: Int = 0
+  key: Str = ""
+  kids: List of Node = []
+
+  fn gap(take self, n: Int) -> Node { self.gap = n; return self }
+  fn child(take self, c: Node) -> Node { self.kids.push(c); return self }
+  fn child_if(take self, cond: Bool, c: Node) -> Node {
+    if cond { self.kids.push(c) }
+    return self
+  }
+  fn children_of(take self, xs: List of T, f: fn(T) -> Node) -> Node {
+    for x in xs { self.kids.push(f(x)) }
+    return self
+  }
+}
+
+fn view(m: Model, ui: Ui) -> Node {
+  let draft = ui.slot("draft", "")
+  let shown = visible(m)
+  let tabs = Row()
+    .gap(2)
+    .children_of([Filter.All, Filter.Active, Filter.Done], fn(f) => Button(label_of(f))
+      .key("tab-{f}")
+      .active(m.filter == f)
+      .on_click(Msg.SetFilter(f)))
+  return Column()
+    .gap(8)
+    .child(Text("Todos").style(Style.Title))
+    .child(Row()
+      .gap(4)
+      .child(Input().key("draft").slot(draft).placeholder("What needs doing?").on_enter(Msg.Add(draft.get())))
+      .child(Button("Add").on_click(Msg.Add(draft.get()))))
+    .child(tabs)
+    .child_if(shown.is_empty(), Text("Nothing to do").style(Style.Dim))
+    .children_of(shown, fn(t) => Row()
+      .key("todo-{t.id}")
+      .gap(4)
+      .child(Checkbox().checked(t.done).on_toggle(Msg.Toggle(t.id)))
+      .child(Text(t.title).style(if t.done { Style.Struck } else { Style.Normal }))
+      .child(Button("x").on_click(Msg.Delete(t.id))))
+    .child_if(m.items.any(fn(t) => t.done), Button("Clear completed").on_click(Msg.ClearDone))
+}
+
+fn update(mut m: Model, msg: Msg) {
+  match msg {
+    Add(title) => {
+      if title != "" {
+        m.items.push(Todo(id: m.next_id, title: title, done: false))
+        m.next_id += 1
+      }
+    },
+    Toggle(id) => {
+      for t in m.items.iter_mut() {
+        if t.id == id { t.done = not t.done }
+      }
+    },
+    Delete(id) => { m.items.retain(fn(t) => t.id != id) },
+    SetFilter(f) => { m.filter = f },
+    ClearDone => { m.items.retain(fn(t) => not t.done) },
+  }
+}

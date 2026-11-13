@@ -1,0 +1,52 @@
+# Benchmark 3, a test suite (nested groups, shared setup) and an HTML page, D2.
+pub fn group(name: Str, setup: Optional of fn() -> Fixture = none, before: Optional of fn(Fixture) = none, kids: Spec...) -> Spec {
+  return Spec.Group(name: name, setup: setup, before: before, kids: kids)
+}
+
+fn spec() -> Spec {
+  return group("Stack", setup: fn() => Stack.new(),
+    group("empty",
+      case("is empty", fn(s) => expect(s.is_empty())),
+      case("pop gives none", fn(s) => expect_eq(s.pop(), none)),
+      case("peek gives none", fn(s) => expect_eq(s.peek(), none)),
+    ),
+    group("with three items", before: fn(s) { s.push(1); s.push(2); s.push(3) },
+      case("len is 3", fn(s) => expect_eq(s.len(), 3)),
+      case("pop gives the last pushed", fn(s) => expect_eq(s.pop(), some(3))),
+      group("after one pop", before: fn(s) { s.pop() },
+        case("len is 2", fn(s) => expect_eq(s.len(), 2)),
+        case("peek gives 2", fn(s) => expect_eq(s.peek(), some(2))),
+      ),
+      case("clear empties", fn(s) { s.clear(); expect(s.is_empty()) }),
+    ),
+    group("push many",
+      for n in [1, 10, 1000] => case("len after {n} pushes", fn(s) {
+        for i in 0..n { s.push(i) }
+        expect_eq(s.len(), n)
+      }),
+    ),
+  )
+}
+
+const LINKS = [Link("Home", "/"), Link("Stock", "/stock"), Link("About", "/about")]
+
+fn page(heading: Str, rows: List of Row) -> Html {
+  return html(
+    head(title(heading)),
+    body(
+      nav(
+        for l in LINKS => a(l.label, href: l.url),
+      ),
+      h1(heading),
+      table(
+        tr(for h in ["Name", "Qty", "Price"] => th(h)),
+        if rows.is_empty() => tr(td("no rows", colspan: 3)),
+        for r in rows => tr(
+          td(r.name),
+          td("{r.qty}", align: Align.Right),
+          td("{r.price:.2}", align: Align.Right),
+        ),
+      ),
+    ),
+  )
+}

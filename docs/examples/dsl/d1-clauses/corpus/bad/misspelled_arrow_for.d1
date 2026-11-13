@@ -1,0 +1,4 @@
+# expect: 3: expected `=>` in the `for` clause
+fn f(xs: List of Int) {
+  let a = [for x in xs -> x]
+}

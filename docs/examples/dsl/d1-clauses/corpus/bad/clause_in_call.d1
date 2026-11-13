@@ -1,0 +1,4 @@
+# expect: 3: only allowed as an item directly inside
+fn f(xs: List of Int) {
+  show(if xs.is_empty() => "none")
+}

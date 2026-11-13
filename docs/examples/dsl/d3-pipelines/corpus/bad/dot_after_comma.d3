@@ -1,0 +1,5 @@
+# expect: 3: line ends with `,`
+fn f() -> Node {
+  let a = Column(),
+    .child(Text("x"))
+}

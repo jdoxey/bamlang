@@ -1,0 +1,4 @@
+# expect: 2: cannot have a default
+pub fn column(gap: Int = 0, kids: Node... = []) -> Node {
+  return Node.Column(kids)
+}

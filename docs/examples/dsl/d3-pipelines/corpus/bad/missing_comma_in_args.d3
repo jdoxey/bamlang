@@ -1,0 +1,4 @@
+# expect: 3: a `,` is probably missing
+fn f(xs: List of Int) -> Node {
+  return Column().children_of(xs fn(x) => Text(x))
+}

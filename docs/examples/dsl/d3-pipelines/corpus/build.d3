@@ -1,0 +1,24 @@
+# Benchmark 2, build file, D3. Three targets, shared defaults, an OS conditional, a loop over platforms.
+const PLATFORMS = ["linux-x64", "macos-arm64", "windows-x64"]
+const VERSION = "1.4.0"
+
+pub fn build(b: Build) -> Project {
+  let windows = b.os == Os.Windows
+  let defaults = Defaults(std: "c11", warnings: true, opt: if b.release { Opt.Speed } else { Opt.None })
+  let core = Lib("core")
+    .srcs(b.glob("src/core/*.c"))
+    .define("VERSION={VERSION}")
+    .define_if(windows, "WIN32_LEAN_AND_MEAN")
+    .link_if(windows, "ws2_32")
+    .link_if(not windows, "pthread")
+  return Project("acme")
+    .version(VERSION)
+    .defaults(defaults)
+    .target(core)
+    .target(Exe("cli").srcs(["src/cli/main.c"]).dep("core"))
+    .target(Exe("core_tests").srcs(b.glob("tests/*.c")).dep("core").test())
+    .targets_of(PLATFORMS, fn(p) => Package("acme-{p}")
+      .platform(p)
+      .dep("cli")
+      .archive(if p.starts_with("windows") { Zip } else { TarGz }))
+}

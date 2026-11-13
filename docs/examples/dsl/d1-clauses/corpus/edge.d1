@@ -1,0 +1,16 @@
+# Edge cases for D1: if-expressions and iflet stay legal as list items; clauses nest; guards; names `if:`/`for:`.
+fn edge(xs: List of Int, opt: Optional of Int) {
+  let a = [1, if opt == none { 2 } else { 3 }, 4]
+  let b = [if x = opt { x } else { 0 }]
+  let c = [for x in xs if x > 1 => x * 2, if xs.is_empty() => 0, 9]
+  let d = [for row in xs => [for x in xs => x + row]]
+  let e = Cfg(if: 1, for: [for x in xs => x])
+  let f = [for (i, x) in xs.enumerate() => i + x]
+  let g = [
+    if a == 1 => "one"
+    ,
+    for x in xs
+      if x != 3
+        => x,
+  ]
+}

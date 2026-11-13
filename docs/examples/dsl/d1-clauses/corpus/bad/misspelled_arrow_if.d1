@@ -1,0 +1,4 @@
+# expect: 3: expected `=>` in the `if` clause
+fn f(ok: Bool) {
+  let a = [1, if ok -> 2]
+}

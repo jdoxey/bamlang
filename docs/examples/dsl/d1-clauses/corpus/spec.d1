@@ -1,0 +1,48 @@
+# Benchmark 3, a test suite (nested groups, shared setup) and an HTML page, D1.
+fn spec() -> Spec {
+  return Group(name: "Stack", setup: fn() => Stack.new(), kids: [
+    Group(name: "empty", kids: [
+      Case("is empty", fn(s) => expect(s.is_empty())),
+      Case("pop gives none", fn(s) => expect_eq(s.pop(), none)),
+      Case("peek gives none", fn(s) => expect_eq(s.peek(), none)),
+    ]),
+    Group(name: "with three items", before: fn(s) { s.push(1); s.push(2); s.push(3) }, kids: [
+      Case("len is 3", fn(s) => expect_eq(s.len(), 3)),
+      Case("pop gives the last pushed", fn(s) => expect_eq(s.pop(), some(3))),
+      Group(name: "after one pop", before: fn(s) { s.pop() }, kids: [
+        Case("len is 2", fn(s) => expect_eq(s.len(), 2)),
+        Case("peek gives 2", fn(s) => expect_eq(s.peek(), some(2))),
+      ]),
+      Case("clear empties", fn(s) { s.clear(); expect(s.is_empty()) }),
+    ]),
+    Group(name: "push many", kids: [
+      for n in [1, 10, 1000] => Case("len after {n} pushes", fn(s) {
+        for i in 0..n { s.push(i) }
+        expect_eq(s.len(), n)
+      }),
+    ]),
+  ])
+}
+
+const LINKS = [Link("Home", "/"), Link("Stock", "/stock"), Link("About", "/about")]
+
+fn page(heading: Str, rows: List of Row) -> Html {
+  return Html(kids: [
+    Head(kids: [Title(heading)]),
+    Body(kids: [
+      Nav(kids: [
+        for l in LINKS => A(l.label, href: l.url),
+      ]),
+      H1(heading),
+      Table(kids: [
+        Tr(kids: [for h in ["Name", "Qty", "Price"] => Th(h)]),
+        if rows.is_empty() => Tr(kids: [Td("no rows", colspan: 3)]),
+        for r in rows => Tr(kids: [
+          Td(r.name),
+          Td("{r.qty}", align: Align.Right),
+          Td("{r.price:.2}", align: Align.Right),
+        ]),
+      ]),
+    ]),
+  ])
+}

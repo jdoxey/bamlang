@@ -1,0 +1,4 @@
+# expect: 3: a `,` is probably missing
+fn f(xs: List of Int) {
+  let a = [for x in xs => x y]
+}

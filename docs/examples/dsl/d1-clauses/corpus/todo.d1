@@ -1,0 +1,80 @@
+# Benchmark 1, todo UI, D1 (clause items in lists). Library types: Column, Row, Text, Input, Button, Checkbox.
+type Todo {
+  id: Int
+  title: Str
+  done: Bool
+}
+
+enum Filter { All, Active, Done }
+
+enum Msg {
+  Add(Str)
+  Toggle(Int)
+  Delete(Int)
+  SetFilter(Filter)
+  ClearDone
+}
+
+type Model {
+  items: List of Todo = []
+  filter: Filter = Filter.All
+  next_id: Int = 1
+}
+
+fn label_of(f: Filter) -> Str {
+  return match f {
+    All => "All",
+    Active => "Active",
+    Done => "Done",
+  }
+}
+
+fn visible(m: Model) -> List of Todo {
+  return match m.filter {
+    All => m.items,
+    Active => m.items.filter(fn(t) => not t.done),
+    Done => m.items.filter(fn(t) => t.done),
+  }
+}
+
+fn view(m: Model, ui: Ui) -> Node {
+  let draft = ui.slot("draft", "")
+  let shown = visible(m)
+  return Column(gap: 8, kids: [
+    Text("Todos", style: Style.Title),
+    Row(gap: 4, kids: [
+      Input(key: "draft", slot: draft, placeholder: "What needs doing?", on_enter: Msg.Add(draft.get())),
+      Button("Add", on_click: Msg.Add(draft.get())),
+    ]),
+    Row(gap: 2, kids: [
+      for f in [Filter.All, Filter.Active, Filter.Done] =>
+        Button(label_of(f), key: "tab-{f}", active: m.filter == f, on_click: Msg.SetFilter(f)),
+    ]),
+    if shown.is_empty() => Text("Nothing to do", style: Style.Dim),
+    for t in shown => Row(key: "todo-{t.id}", gap: 4, kids: [
+      Checkbox(checked: t.done, on_toggle: Msg.Toggle(t.id)),
+      Text(t.title, style: if t.done { Style.Struck } else { Style.Normal }),
+      Button("x", on_click: Msg.Delete(t.id)),
+    ]),
+    if m.items.any(fn(t) => t.done) => Button("Clear completed", on_click: Msg.ClearDone),
+  ])
+}
+
+fn update(mut m: Model, msg: Msg) {
+  match msg {
+    Add(title) => {
+      if title != "" {
+        m.items.push(Todo(id: m.next_id, title: title, done: false))
+        m.next_id += 1
+      }
+    },
+    Toggle(id) => {
+      for t in m.items.iter_mut() {
+        if t.id == id { t.done = not t.done }
+      }
+    },
+    Delete(id) => { m.items.retain(fn(t) => t.id != id) },
+    SetFilter(f) => { m.filter = f },
+    ClearDone => { m.items.retain(fn(t) => not t.done) },
+  }
+}
