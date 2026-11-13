@@ -55,3 +55,13 @@ three calls deep that must run four drops while it unwinds. CI runs each spike o
 - **K1 (own LLVM IR):** `dx p` gives `p : 0x3 [Type: Point *]` and "Unable to read memory at Address 0x3". The Win64
   ABI passes a 16-byte struct by reference, while K1's IR passes `%Point` by value with a `dbg.declare` that no
   longer matches. This is review S2 (the frontend owns the per-target ABI) showing up as wrong debug info.
+
+## Final CI (43490431655, all green)
+
+- **K1 on Windows:**
+  - Its SEH funclets also pass `spike2.p3`: the drop chain, the crew trap and the enum output.
+  - `uncaught.p3` passes.
+  - Coverage mapping works (13 regions, 1 missed).
+  - Only cdb's view of struct parameters is wrong.
+- **What this changes:** it narrows K1's loss to the debug-info and ABI ownership cost recorded in ADR-0008, and
+  keeps it as the starting point if an LLVM emitter is ever added behind the lowered IR.
