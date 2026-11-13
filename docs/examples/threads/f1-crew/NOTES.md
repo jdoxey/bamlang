@@ -1,44 +1,49 @@
-# F1 Crew: NOTES (Rust 1.100, std only)
+# F1 Crew: NOTES (Rust 1.100, std only), loop 2
 
-SPEC.md asks for: A parallel map of squares 1..=1_000_000 on 4 threads; B 4 workers and 20 jobs over channels with a
-mutex counter; C a main loop with a cancellable 10-step job, deterministic by a tick handshake. Run `./run.sh`.
+SPEC.md asks for: A parallel map of squares on 4 threads; B 4 workers and 20 jobs with a mutex counter; C a main
+loop with a cancellable 10-step job. Run `./run.sh` (main diff, then `--selftest`). `crew.txt` shows A, B, C in the
+real language's pseudo-syntax, with decisions 1-3, 5-7 marked and every bug variant's expected report.
 
-**Model.** `Crew` wraps `thread::scope` (token, `go`, `channel`, `each_part`, `crew()`); it re-raises the first child
-panic after cancelling siblings. C wraps the whole event loop in one `crew` (Rust cannot express a non-blocking
-"Live crew" safely). Quit cancels the token, drops the ack sender, and the crew join ends the loop.
+**Changed in loop 2 (review-f1 decisions).** C is now `crew(|c| app_run(c, ..))`: the event loop is the crew body;
+handlers get `&Crew` for one call; `start` uses a moving `c.go` that returns a `JobHandle` (`cancel()` is per job);
+progress comes back on a channel drained with `try_recv` (D4, D6). Errors (D7): first real error re-raised as
+"<msg> (plus N more)", the parent's error wins, a `Cancelled` exit is filtered, early exit cancels then joins.
+Locks (D5): `Lock<T>` records a per-thread "holding" site; a second lock, `Rx::recv` or `sleep` while holding
+panics `TRAP: blocking call while holding lock at <site>` (`#[track_caller]`). The Part B job queue is now a clonable
+`Rx`, so the old `Mutex<Receiver>` hack is hidden inside the model as a stdlib leaf lock.
 
-**Lines** (non-blank, non-comment): A 16, B 31, C 75 (C includes job, message enum and pump); `main` 5.
-Modelling helpers ("stands in for a built-in"): 61, counted apart.
+**Lines** (non-blank, non-comment): A 16, B 33, C 90 (job, enum, App, pump, run), selftest 126, main 16.
+Model 188 ("stands in for a built-in"), counted apart. C grew from 75: the App struct and the handle.
 
-**Rules a programmer had to know:** (1) threads start only via `c.go`; (2) children borrow parent data, but the data
-must be declared before `crew(..)` (a local made inside the body does not live long enough); (3) `each_part` gives
-disjoint slices; (4) the token is cooperative, so check it at checkpoints; (5) drop every sender you do not hand
-off; (6) never touch a mutex while holding it. In real Rust the `Send`/`'scope` rules are extra.
+**Selftest** (all pass, 20/20 runs, exit 0):
+- two failing children: `"bang (plus 1 more)"`.
+- a child that leaves by `check()` after a sibling fails is not reported: message is exactly `"real"`.
+- `crew_try` body returns Err: sibling sees the cancel and has finished when the crew returns.
+- `h1.cancel()` stops job 1 only; job 2 is untouched until `h2.cancel()`.
+- re-lock in a helper (child process): stdout has `TRAP: blocking call while holding lock at src/main.rs:258:14
+  (lock taken at ...)`, exit 101, no hang. `recv` while holding: same TRAP.
 
-**Bug variants** (scratch copies in /tmp/claude-1000/threads-scratch/f1-*):
-- A, two threads write the same chunk (`c.go(|_| out[0] = ..)` twice): compile error
-  `error[E0499]: cannot borrow `out` as mutable more than once at a time ... first mutable borrow occurs here`.
-- B1, re-lock inside `bump` while held: hangs (killed after 5 s with timeout, exit 124; output stops after line A).
-- B2, collector stops after 5 results (`take(5)` then drop receiver): usually silent. 37/40 runs printed
-  `B: total=55 counter=20` with exit 0. 3/40 runs a worker's `send` failed: `collector gone: SendError { .. }`,
-  re-raised by the crew after cancelling siblings, exit 101.
-- B3, forgotten `drop(rtx)`: hangs (killed after 5 s with timeout, exit 124; output stops after line A).
-- C1, job touches `static MAIN_STATE: Cell<u32>`: compile error
-  `error[E0277]: `Cell<u32>` cannot be shared between threads safely ... the trait `Sync` is not implemented for `Cell<u32>``.
-  C2, same with `thread_local!`: compiles, silent; the job bumps its own copy, main still prints 0.
-- Extra, job panics at step 3: stderr `job exploded at step 3`, then main's `recv` fails:
-  `job vanished: RecvError` (my pump's `expect`), exit 101. The crew would re-raise the job's own payload if the
-  body had not panicked first.
+**Rules the programmer must know (honest list, 14):** (1) threads start only via `c.go`; (2) a child may borrow only
+variables declared above the crew block in the crew-opening function; elsewhere use a moving closure; (3) a container
+borrowed shared into a crew is frozen until the join, borrowed mutably it goes to one child; (4) closures passed to
+crew-reaching parameters may not mutate captures; (5) no module state through such parameters; (6) `each_part` gives
+`Part` views that cannot be stored; (7) drop every sender you do not hand off; (8) never take a lock, or make a
+blocking call, while holding a lock (traps at run time); (9) cancellation is cooperative: only blocking calls and
+`c.check()` are points, CPU loops need `check`; (10) no cancellation inside `drop`; (11) `go` returns a handle for
+per-job cancel, `cancel_all` for everything; (12) the first error wins, "plus N more", cancelled exits are not errors;
+(13) early exit cancels then joins; (14) handlers get `c` for the call only.
 
-**Cancellation** is checked in `job` at the loop top, outside any lock, after the ack. `cancel` sets the token, then
-acks. **Errors:** a panic in a child is caught, cancels the token, and is re-raised at the crew's end (first wins).
+**Bug variants** (Rust results from the loop-1 scratch copies; the real language's reports are in `crew.txt`):
+- A same chunk: Rust `E0499` cannot borrow `out` as mutable more than once. Real: compile error (D1).
+- B1 re-lock: Rust hung. Now the model traps (selftest). B2 collector exits after 5: Rust usually silent (37/40),
+  3/40 `collector gone`; real language: early exit cancels, workers fail, re-raised. B3 forgotten drop: hangs
+  (timeout 5 s, exit 124); real: debug wait-for cycle, release thread dump.
+- C1 `static Cell`: Rust `E0277` not `Sync`. C2 `thread_local!`: compiles, silent. Real: compile error for both (D3).
+- D1 par_map mutates capture, D2 child borrows loop-local, D3 child pushes to a frozen list: rustc and `crew.txt`
+  agree only on D2/D3 in spirit (E0373/E0502); D1-style freezing is NOT checked by this model, `crew.txt` only.
 
-**Kernels vs Rust.** Free: owned endpoints (move semantics; `drop` closes), `recv` gives `Err` and `send` gives
-`Err` as visible results, borrowing and disjoint writes (A is a compile error), module state not shared (C1).
-Needs the real language: no nested locking (B1 hangs here; the call-graph check would be a compile error);
-cancel-outside-lock (only by hand here); all-blocked detection (B1 and B3 hang here; the debug build would
-print the wait-for cycle: main blocked in `recv`, workers gone for B3). Rust's `thread_local!` hole (C2) would
-be closed by the call-graph check. B2 would still be a silent short total; only the `send` failure shows it.
-
-**Hidden:** the `Mutex<Receiver>` job queue (std mpsc has one consumer); `thread::scope` needs captured data
-declared outside; the crew's token is shared by all children, so `cancel` stops every child, not one.
+**Not checked by the Rust model:** decisions 1, 2, 3 (partial), 8; blocking `send` (the channel is unbounded);
+lock-while-`join` (scope joins implicitly); recv returning closed on cancel (job still needs the ack);
+non-`Cancelled` errors caused by cancellation (a failed `send`) are still reported.
+**Hidden:** `try_recv` pumping spins with a 1 ms sleep (deterministic because of the tick handshake, not a real
+event loop); `thread::scope` needs captured data declared outside.

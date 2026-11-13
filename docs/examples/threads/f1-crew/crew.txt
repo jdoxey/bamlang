@@ -1,0 +1,117 @@
+crew.txt: benchmarks A, B, C in illustrative pseudo-syntax of the real language (not compiled by anything).
+Rust cannot check decisions 1 and 2 (and only partly 3), so this file shows where they apply and what the
+real compiler or runtime reports. Decision numbers are from review-f1.md.
+
+---------------------------------------------------------------- A. parallel map
+fn squares(input List of Int) List of Int
+    var out = List.filled(1_000_000, 0)
+    crew c
+        // D1: `input` is borrowed shared into the crew, so it is FROZEN until the crew ends
+        //     (no count updates; any write to it traps/compile-errors). `out` is borrowed mutably,
+        //     so it goes to exactly one owner: each_part, which hands each child its own Part.
+        // D3: input and out are declared in this function, at or above the crew block: borrowable.
+        c.each_part(out, 4, fn(offset, part)         // Part of Int: borrow-only view (D9), cannot be stored
+            for j, o in part.enumerate()
+                part[j] = input[offset + j] * input[offset + j]
+    out
+
+---------------------------------------------------------------- B. worker pool
+fn pool() Int
+    counter = Lock(0)
+    crew c
+        (jtx, jrx) = c.channel()           // owned endpoints; drop closes
+        (rtx, rrx) = c.channel()
+        for _ in 0..4
+            rtx2 = rtx.clone()
+            jrx2 = jrx.clone()
+            c.go(fn()                      // D2: closure moves rtx2, jrx2; borrows `counter` (declared above the crew)
+                while n = jrx2.recv()      // blocking call = cancellation point (D6); no lock held here
+                    bump(counter)
+                    rtx2.send(n * n) or fail "collector gone"
+            )
+        drop rtx
+        drop jrx
+        for n in 1..=20
+            jtx.send(n)
+        drop jtx
+        var total = 0
+        while v = rrx.recv()
+            total += v
+        total
+
+fn bump(counter Lock of Int)
+    lock counter
+        counter.value += 1                 // D5: nothing blocking inside; `lock a, b { }` for several locks
+
+---------------------------------------------------------------- C. main loop + cancellable job
+fn main()
+    partial = Lock([])
+    crew c
+        app_run(c, partial, events)        // D4: the event loop IS the crew body; no detached "live crew"
+    print "C: joined"
+
+fn app_run(c Crew, partial Lock of List of Int, events List of Str)
+    (tx, rx) = c.channel()
+    var app = App(partial, tx, rx, none)
+    for ev in events
+        app.on_event(c, ev)                // handler gets `c` as a call-length borrow (cannot be stored, D3)
+
+fn App.on_event(self, c Crew, ev Str)
+    match ev, self.live
+    "start", none
+        (atx, arx) = c.channel()
+        tx = self.tx.clone()
+        // D2: `partial` is a parameter, not a local of the crew-opening function, so a borrow is not allowed;
+        //     c.go must be a MOVING closure. D6: go returns a handle with per-job cancel().
+        handle = c.go(move fn() job(partial, tx, arx))
+        self.pump()                        // drains with rx.try_recv() between events
+        self.live = (handle, atx)
+    "cancel", (handle, ack)
+        handle.cancel()                    // D6: cancels this job only; cancel_all() would hit every child
+        ack.send(())
+    "quit", _
+        c.cancel_all()
+    // D7: any child failure is re-raised at the end of the crew as "<first> (plus N more)"; children that
+    //     left because of cancellation are not counted; return/break/error out of the body cancels, then joins.
+
+fn job(partial, tx, ack)
+    for k in 1..=10
+        c.check()                          // D6: explicit check, outside any lock; recv/send/sleep also check
+        lock partial
+            partial.value.push(k)          // lock ends before the blocking send/recv (D5)
+        tx.send(Progress(k))
+        if not ack.recv() then return      // closed => stop
+
+---------------------------------------------------------------- bug variants: what the real language reports
+A (same chunk): two c.go closures both borrow `out` mutably.
+    compile error: cannot borrow `out` mutably twice in one crew: `out` goes to exactly one child (D1).
+B1 (re-lock in helper): lock counter { bump(counter) } where bump locks again.
+    lexically obvious: compile error "nested lock of `counter`". Through a helper: run-time (D5, all builds):
+    TRAP: blocking call while holding lock at pool.lang:22:9 (lock taken at pool.lang:30:5)   [not a hang]
+B2 (collector exits after 5 results): the early `return` out of the crew body cancels, then joins (D7); the
+    workers' `send` gets a closed result and `or fail "collector gone"` fires; the crew re-raises it
+    ("collector gone (plus 3 more)" in release; all four printed in debug). No longer a silent short total.
+B3 (forgotten `drop rtx`): not a compile error. Hangs in release, with the thread dump on Ctrl+Break showing
+    "main waiting on rrx at pool.lang:27"; debug builds report the wait-for cycle (D8), main blocked on
+    workers' sender that main itself holds.
+C1 (job touches module state `MAIN_STATE`): passing module state to anything that reaches a crew child is
+    compile error: "module state `MAIN_STATE` reaches crew child `job`; pass a Mutex/Atomic or message it" (D3).
+C2 (module state via thread-local): the same compile error; thread-locals are module state.
+D1 (par_map closure mutates a capture):
+        n = 0
+        par_map(xs, 4, fn(x) { n = n + 1; x * 2 })
+    compile error (D2): "closure passed to `par_map` runs on crew children and cannot mutate captured `n`;
+    use an Atomic or a Lock".
+D2 (child borrows a loop-local):
+        for i in 0..3
+            buf = make_buf(i)
+            c.go(fn() use(buf))            // borrows `buf`, declared inside the crew block's loop
+    compile error (D3): "`buf` is declared below the crew block; use `c.go(move fn() ...)`".
+D3 (child pushes to a shared-borrowed list):
+        names = ["a", "b"]
+        crew c
+            c.go(fn() print names[0])       // shared borrow: names is FROZEN for the crew's life (D1)
+            c.go(fn() names.push("c"))      // also needs a mutable borrow
+    compile error (D1) when seen statically: "`names` is frozen: shared into this crew by line N".
+    If the write is only reachable dynamically (through an alias), it traps:
+    TRAP: write to frozen container `names` at x.lang:6:17 (frozen by crew at x.lang:3:5)
