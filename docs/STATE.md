@@ -2,9 +2,9 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D2, generics and containers (how `List`, `Map`, `Pool` exist under G3). Criteria and 11 ideas done; real examples of the top 3 next.
+- **Now:** D2, generics and containers (how `List`, `Map`, `Pool` exist under G3). Option A (fixed built-in containers, no user generics) leads after real code and a review; loop 2 (A+) being tested.
 - **Decided:** ADR-0001 memory model, Accepted: owned values, moves, explicit `.copy()`, and checked handles into pools. No reference counting, no `weak`. Veto by opening an issue.
-- **Needs you:** nothing. To steer or veto, open a GitHub issue.
+- **Needs you:** issue #3, a yes/no on whether G3 allows built-in `List of T`-style types. I'm carrying on assuming yes.
 
 ## Next action
 
