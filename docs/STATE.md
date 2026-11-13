@@ -2,23 +2,26 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D2, generics and containers (how `List`, `Map`, `Pool` exist under G3). Option A (fixed built-in containers, no user generics) leads after real code and a review; loop 2 (A+) being tested.
-- **Decided:** ADR-0001 memory model, Accepted: owned values, moves, explicit `.copy()`, and checked handles into pools. No reference counting, no `weak`. Veto by opening an issue.
+- **Now:** D3, the concurrency model (what crosses threads, how shared state is guarded).
+- **Decided:** ADR-0001 memory model (owned values, moves, checked handles into pools) and ADR-0002 containers (a frozen built-in set like `List of Employee`; users never write type parameters). Veto by opening an issue.
 - **Needs you:** issue #3, a yes/no on whether G3 allows built-in `List of T`-style types. I'm carrying on assuming yes.
 
 ## Next action
 
-Roadmap item **D2** (ADR-0002, Full). Step 1 research is in `docs/adr/0002-research/research.md`.
+Roadmap item **D3** (ADR-0003, Full). Inputs:
+- ADR-0001 rule 6: values move into threads, `Mutex of T` with `lock`, re-lock traps, and module state is main-thread only, inferred over the call graph.
+- ADR-0002: `Channel`, `Mutex` and `Atomic` are in the frozen set; `take` parameters; escaping closures.
 
-1. Step 2: write criteria (include R6 transparency), then ideas: at least 6 sane, 4 crazy, and combinations. ADR-0001 needs `Pool of T`, `Handle of T`, `List of T`, `Map of K to V`, `Mutex of T`, `Channel of T` and an optional type to exist.
-2. Step 3: write the three test programs from the research (generic sort with a user comparator, an LRU cache used for two key/value pairs, an `Optional` pipeline) in the closest real languages for the top 3 options, as `docs/examples/generics/<option>/` with `run.sh`.
-3. Step 4: separate Opus reviewer attacks the winner; score; decide; ADR under 300 lines.
+1. Step 1: research 4-8 languages' thread models (Go, Rust, Swift actors, Erlang, Pony, Java, C#, Zig), with what went wrong. Save notes in `docs/adr/0003-research/`.
+2. Step 2: criteria first (include R6), then 6 sane and 4 crazy ideas, plus combinations.
+3. Step 3: write the top 3 as real code on chatsim's worker and stats, or on a new threaded benchmark, with `run.sh`, green on all three OSes.
+4. Step 4: an Opus reviewer attacks the winner; score with a script; decide; ADR under 300 lines.
 
 Then continue down `docs/ROADMAP.md`.
 
 ## Open questions carried forward
 
-- **P2, built-in parameterised types under G3:** decide in D2.
+- **Issue #3 (G3 reading):** ADR-0001 and ADR-0002 assume yes.
 - **Q15, is G11 syntax only:** decide in D7. Until then, assume syntax only for v1.
 - From ADR-0001: D3 must define channels, `Mutex of T` and the main-thread rule; D4 optional handles and traps; D5 methods on pool entries.
 
@@ -36,4 +39,5 @@ Nothing.
 
 - 2026-11-13: repo set up from the planning conversation.
 - 2026-11-13: first run on Sonnet skipped the real-examples step. John reset `main`; that work is on the `sonnet-attempt` branch for reference only.
+- 2026-11-13: ADR-0002 Accepted after two review loops (a tie broken by the examples and reversibility). OCaml added to CI on Linux and macOS.
 - 2026-11-13: chatsim in C, Swift (O1), Rust (O4) and C (O9); widgets under O9-S. Opus review found a fatal hole in O9, fixed as O9-S. ADR-0001 Accepted. Issues #1 and #2 handled and closed.

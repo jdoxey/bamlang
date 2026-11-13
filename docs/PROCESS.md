@@ -54,11 +54,13 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
 - **Write real code early.** Forty prose ideas taught less than one concrete program would have.
 - **Check for an existing answer in the findings.** Both brainstorms kept pointing at pools and handles, and it was filed as a library detail.
 - **Run a second, differently shaped example before the review closes.** In ADR-0001 the widgets program found eight rule gaps that the reviewer missed, because chatsim had no hierarchies and used global pools.
+- **Recompute every score with the script, including the reviewer's.** In ADR-0002 a reviewer's hand arithmetic turned a tie into a 7-point win. Also, rerun the example after each decision that changes a rule, because the A+ example went stale within one step.
 - **A GUI example is too big.** Use a small scripted simulation that has the same lifetimes (see `docs/examples/chatsim/SPEC.md`).
 
 ## Changelog
 
 - 2026-11-13: lesson from ADR-0001's retro (second example).
+- 2026-11-13: lesson from ADR-0002's retro (recompute scores; rerun examples after rule changes).
 
 - 2026-11-13: first version, written from the ADR-0001 work.
 - 2026-11-13: added the 85% usage cap and the Debian and three-OS CI notes.
