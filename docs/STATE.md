@@ -2,7 +2,7 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** ADR-0001 (memory model): O9, owned values plus checked handles into pools, leads 85 to 71 after real code in C, C++ and Rust. A reviewer is attacking it before acceptance.
+- **Now:** ADR-0001 (memory model): O9, owned values plus checked handles into pools, leads 85 to 71 after real code in C, Swift and Rust. A reviewer is attacking it before acceptance.
 - **Decided so far:** nothing final. Your rulings are in `docs/RULINGS.md`.
 - **Needs you:** nothing. To steer or veto, open a GitHub issue.
 
