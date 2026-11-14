@@ -7,13 +7,9 @@
 
 ## Context
 
-G6 asks for "a good standard library with Lists, Arrays, Time, Calendar, etc." Earlier ADRs passed items on:
-- the container quality bar (ADR-0002, owner answer);
-- `Error` kinds, `Report`, `Txn`, `replace` and `try_alloc` (ADR-0004);
-- which DSL libraries ship (ADR-0007);
-- primitive sets for subclassing built-ins (ADR-0005 amendment 1).
-
-This scope is cheap to grow later, so the decision is Light.
+G6 asks for "a good standard library with Lists, Arrays, Time, Calendar, etc." Earlier ADRs passed on the container
+quality bar (0002), `Error` kinds and helpers (0004), the DSL libraries (0007) and subclassing primitive sets (0005
+amendment 1). This scope is cheap to grow later, so the decision is Light.
 
 ## Decision
 
@@ -30,18 +26,11 @@ This scope is cheap to grow later, so the decision is Light.
    tests, and a CI benchmark against C++ `std::` and Rust `std` equivalents. The target is within 1.5× at `-O2` on all
    three OSes for push/get, insert/lookup and sort, with any miss reported in CI.
 3. **`std` modules in v1:**
-   - **Every program:** `core` (numbers, `Str`, `Optional`, `Result`, `Error`, `Report`, `Txn`), `text` (formatting,
-     number parsing, basic Unicode), `math`, `random`.
-   - **System access:** `fs`, `path`, `io` (buffered stdin and stdout), `process` (arguments, environment, exit code,
-     running a child process).
-   - **Time:**
-     - `Instant` and `Duration` (monotonic);
-     - `DateTime` in UTC, with the local offset from the OS;
-     - calendar `Date` with weekday, ISO 8601 parse and format, and month and day arithmetic.
-   - **Concurrency:** `sync` (Mutex, Channel, Atomic, crews).
-   - **Networking:** `net` (TCP and UDP, DNS lookup).
-   - **Data:** `json`.
-   - **Tooling:** `test` (D11), `ffi`.
+   - **Core:** `core` (numbers, `Str`, `Optional`, `Result`, `Error`, `Report`, `Txn`), `text`, `math`, `random`.
+   - **System:** `fs`, `path`, `io` (buffered), `process` (arguments, environment, exit, child processes).
+   - **Time:** monotonic `Instant`/`Duration`; UTC `DateTime` with the OS local offset; calendar `Date` (weekday,
+     ISO 8601, month and day arithmetic).
+   - **Other:** `sync` (Mutex, Channel, Atomic, crews), `net` (TCP, UDP, DNS), `json`, `test` (D11), `ffi`.
 4. **`Error.kind`** has 12 values: `not_found`, `exists`, `permission`, `invalid`, `parse`, `io`, `timeout`,
    `closed`, `unsupported`, `no_memory`, `trap`, `other`.
    - `try_alloc` returns `no_memory`.
@@ -53,18 +42,13 @@ This scope is cheap to grow later, so the decision is Light.
    - `SmallList`, `BTreeMap`, `RingBuffer`.
 
    ADR-0009's TOML manifest replaces the build DSL library from ADR-0007's examples.
-6. **Not in v1:**
-   - a native GUI;
-   - TLS and HTTP (wait for `extras`);
-   - regular expressions;
-   - a database driver;
-   - serialisation beyond JSON.
+6. **Not in v1:** a native GUI, TLS and HTTP (wait for `extras`), regular expressions, database drivers, and
+   serialisation beyond JSON.
 7. **Debugger formatters** (M7, ADR-0008 rule 6). gdb, lldb and natvis show List, Array, Map, Set, Str, Handle
    (target or "stale"), enums (the active variant only) and `dyn` (the concrete class).
 
 ## Consequences
 
-- **Gained:** every G6 item is covered, and subclassing (issue #5) is defined for every container.
-- **Cost:** v1 can't serve HTTPS or a desktop GUI.
-- **Main risk:** the benchmark bar is the riskiest commitment in M6.
-- **Revisit:** add modules by a later Light ADR when two real programs need them (ADR-0002's "add a shape" rule).
+Every G6 item is covered, and subclassing (issue #5) is defined for every container. v1 can't serve HTTPS or a
+desktop GUI. The benchmark bar is the riskiest M6 commitment. Add modules by a later Light ADR when two real programs
+need them (ADR-0002's "add a shape" rule).
