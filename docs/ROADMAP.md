@@ -17,7 +17,16 @@ Work top to bottom. Tick an item when its ADR is Accepted or its milestone passe
 - [x] **D11 Testing, coverage and debugger tooling** (Light). ADR-0011 Accepted 2026-11-14: `name_test.p3` + `spec()` data suites run as crew children, `here` locations, golden files, `lang cover` (remapped llvm-cov), `lang debug` with formatters, `lang bench`.
 - [x] **D12 Language name and file extension** (Light). ADR-0012 Accepted 2026-11-14: **Lantern**, `.ltn`, tool `lantern` (John can veto).
 
-## Phase 2: build
+## Phase 1.5: explore (current)
+
+John is exploring the language and making tweaks (ruling R20). See `docs/EXPLORE.md`. The decisions above are a starting point, not final: `docs/TOUR.md` replaces them as the description of the language.
+
+- [ ] **E1** One tour of the whole language in at most 25 concepts (R19).
+- [ ] **E2** Example programs in `examples/*.bam` that match the tour.
+- [ ] **E3** John's tweaks, until he says the language is right.
+- [ ] **E4** Freeze: `docs/SPEC.md` and a test program per rule.
+
+## Phase 2: build (paused until E4)
 
 After D8, write `docs/PLAN.md` with the detailed milestones. The outline:
 

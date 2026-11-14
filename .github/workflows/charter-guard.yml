@@ -23,7 +23,7 @@ jobs:
         run: |
           case "$BEFORE" in 0000000*) echo "First push."; exit 0;; esac
           changed=$(git diff --name-only "$BEFORE" "$AFTER" -- \
-            docs/CHARTER.md docs/RULINGS.md .claude/settings.json .claude/hooks ci/adr-check.sh \
+            docs/CHARTER.md docs/RULINGS.md .claude/settings.json .claude/hooks ci/adr-check.sh ci/tour-check.sh \
             .github/workflows/charter-guard.yml)
           if [ -n "$changed" ]; then
             echo "::error::Owner-only files changed:"; echo "$changed"; exit 1

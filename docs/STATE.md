@@ -1,20 +1,22 @@
 # State
 
-## For John (kept to 10 lines)
+## For John
 
-- **Now:** M0, the conformance test harness (all 12 decisions are made). The language is named **Lantern** (`.ltn`); veto by issue if you dislike it.
-- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes), 0009 dependencies (git paths, MVS, hashed, no build scripts), 0010 stdlib v1 scope, 0011 test/cover/debug tools, 0012 name: Lantern; ADR-0005 amended for inheritance (your issues #5, #6). Veto by opening an issue.
-- **Needs you (optional yes/no):** may CI download a SHA-pinned llvm-mingw (182 MB) to test replacing the 6–7 GB VS Build Tools on Windows? I recommend yes.
+- **Phase:** Explore (`docs/EXPLORE.md`). The compiler and `tests/` are parked.
+- **Next:** paste prompt 1 from `docs/EXPLORE.md` ("Consolidate").
+- **Name:** bam, `.bam` (R16).
 
 ## Next action
 
-**M0** (see `docs/PLAN.md`): create the `compiler/` Cargo workspace (no third-party crates) with a `lantern-tests` harness; copy the `p3n` corpus, expected ASTs and bad files into `tests/` as `.ltn`; wire `cargo test` and the harness into `ci/run.sh` on three OSes with `--allow-missing` until M1. Exit: harness runs on Linux, Windows and macOS. Then M1 (parser, ported from `docs/examples/syntax/p3n/parser.py` plus the ADR-0007 clause and ADR-0005 amendment grammar).
+Wait for John's prompt. Do only what it asks, then stop.
 
-## Open questions carried forward
+## Known problems the consolidation must fix
 
-- **Issue #3 (G3 reading):** answered yes by John. D9 must restrict the generic dialect to the stdlib and `extras`; D10 must set the container quality bar.
-- **Q15:** closed by ADR-0007 (G11 is syntax; frameworks are libraries; D10 scopes the UI library).
-- From ADR-0001: D3 must define channels, `Mutex of T` and the main-thread rule; D4 optional handles and traps; D5 methods on pool entries.
+- **Too many rules.** ADR-0001 to ADR-0009 hold well over 100. The budget is 25 concepts (R19).
+- **The parts disagree.** Amendment 1 of ADR-0005 removed `iface` and `impl`, but `tests/corpus/types.ltn`, `docs/PLAN.md` and ADR-0002 still use them. No example uses inheritance.
+- **Whole-program and inferred checks** (ADR-0003 rules 4–5, ADR-0005 rule 9 and amendment rule 11) fail the 3 am test.
+- **Many run-time traps** stand in for compile-time checks.
+- **Subclassable built-ins** (R15) currently need "primitive sets" and a self-call-set diff tool. Look for something simpler.
 
 ## Environment
 
@@ -24,9 +26,11 @@
 
 ## Blocked
 
-- **D9 toolchain spike (T2 llvm-mingw, T3 zig cc on Windows):** the session's permission check denied an agent that would download and run third-party toolchain binaries in CI. Not retried. T1 (system clang, already green on all three OSes in ADR-0008's CI) is the v1 default until John allows the downloads; see ADR-0009.
+Nothing. John allowed the SHA-pinned llvm-mingw download on Windows (R18); it matters again when the build resumes.
 
 ## Log
+
+- 2026-11-14: John stopped the loop after all 12 decisions. A review found the language too large and inconsistent. Explore phase started; name changed to bam (R16).
 
 - 2026-11-14: D12 done (ADR-0012: Lantern, Light). Phase 1 decisions complete.
 

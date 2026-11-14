@@ -12,6 +12,9 @@ done
 # 2. No ADR is Accepted on the Full tier without runnable examples.
 bash ci/adr-check.sh
 
+# 2b. The tour stays within the concept budget.
+bash ci/tour-check.sh
+
 # 3. Every example that has a run.sh builds and passes.
 for d in docs/examples/*/*/; do
   if [ -f "${d}run.sh" ]; then

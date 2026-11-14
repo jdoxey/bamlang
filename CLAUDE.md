@@ -1,34 +1,32 @@
 # CLAUDE.md
 
-You are building a programming language, about 95% autonomously. John owns it and has little time.
+You are helping John design **bam**, a programming language. John owns it.
 
-## Every session, and after every context compaction
+## Current phase: Explore
 
-1. Read `docs/STATE.md`. It says what to do next.
-2. Run `gh issue list --state open`. An open issue from John outranks everything else.
-3. Do the next item. Update `docs/STATE.md`, commit, and push to `main` after each finished step.
-4. Check open issues again before each roadmap step and after every push. When you have handled an issue from John, comment on it saying what you did, then close it.
+The compiler is paused. John is exploring the language and making tweaks. Read `docs/EXPLORE.md`; it replaces `docs/PROCESS.md` for now.
+
+- **Do exactly what John's prompt asks, then stop.** Don't carry on to other work, and don't work down the roadmap.
+- **End every reply with a summary of at most 10 lines:** what changed, the concept count, and anything John must decide.
+- **Don't touch `compiler/` or `tests/`.** They are parked until John ends this phase.
+- **`docs/TOUR.md` is the single description of the language.** Where an ADR disagrees with it, the tour wins. ADRs are history.
+
+## Every session
+
+1. Read `docs/STATE.md` and `docs/EXPLORE.md`.
+2. Run `gh issue list --state open`. When you handle an issue from John, comment on it with what you did and close it.
+3. Commit and push to `main` when the prompt's work is done. Check CI with `gh run list` and fix failures.
 
 ## Binding documents (never edit these)
 
 - `docs/CHARTER.md`: goals G1–G11 and problems P-*.
 - `docs/RULINGS.md`: John's rulings. They override anything else except the charter.
-- `.claude/settings.json`, `.claude/hooks/`, `~/.claude/lang-budget/`, `ci/adr-check.sh` and `.github/workflows/charter-guard.yml`.
+- `.claude/settings.json`, `.claude/hooks/`, `~/.claude/lang-budget/`, `ci/adr-check.sh`, `ci/tour-check.sh` and `.github/workflows/charter-guard.yml`.
 
-Don't use shell commands to get around this. If one of them looks wrong, open a `needs-john` issue.
-
-## How decisions are made
-
-- Every design decision follows `docs/PROCESS.md` and ends in an ADR in `docs/adr/`.
-- **No step may be skipped.** A Full-tier ADR is not Accepted until its example code exists, runs in CI on all three OSes, and a separate reviewer has attacked the winner. One Full-tier decision is normally many hours of work. If you finish one in under an hour, you skipped something: go back.
-- **You decide.** When goals conflict, pick the option that satisfies the most goals best, and record what was traded away. Don't wait for John.
-- Open a `needs-john` issue only when a decision would break a charter goal outright. Phrase it as a yes/no question with your recommendation, then carry on with other work.
-- John vetoes by opening an issue. A veto reopens the ADR.
+Don't use shell commands to get around this. If one of them looks wrong, say so in your summary.
 
 ## Working rules
 
-- Push straight to `main`. Don't open pull requests. After each push, check CI with `gh run list` and fix failures before starting new work. CI must stay green on Linux, Windows and macOS.
-- Never force-push. Never delete files you didn't create this session.
-- Keep documents short. John reads the top 10 lines of `docs/STATE.md` and nothing else unless he chooses to.
-- If you improve the process, edit `docs/PROCESS.md` and add a line to its changelog. Don't edit this file.
-- If a tool or install is blocked, note it under "Blocked" in `docs/STATE.md` and move to other work.
+- Push straight to `main`. Don't open pull requests. Never force-push.
+- Keep documents short. Prefer a code example to a paragraph.
+- If a tool or install is blocked, say so in your summary and under "Blocked" in `docs/STATE.md`.

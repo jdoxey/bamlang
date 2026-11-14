@@ -27,6 +27,7 @@
       "Edit(~/.claude/lang-budget/**)",
       "Edit(.github/workflows/charter-guard.yml)",
       "Edit(ci/adr-check.sh)",
+      "Edit(ci/tour-check.sh)",
       "Bash(git push --force*)",
       "Bash(git push -f*)"
     ]
