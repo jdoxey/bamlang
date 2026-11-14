@@ -1,9 +1,9 @@
 # ADR-0005: Types, methods and interfaces
 
 - **Status:** Accepted
-- **Date:** 2026-11-13
+- **Date:** 2026-11-13; amendment 1 (inheritance, issue #5) 2026-11-14
 - **Tier:** Full (see `docs/PROCESS.md`)
-- **Examples:** `docs/examples/types` (T3+ in `t3plus/`; rivals in `t1-records/`, `t2-modules/`, `t3-enum-ext/`)
+- **Examples:** `docs/examples/types` (amendment 1: H1b in `inherit/h1b/`, rivals `inherit/h1`–`h3`; T3+ in `t3plus/`; rivals in `t1-records/`, `t2-modules/`, `t3-enum-ext/`)
 - **Decided by:** Claude (ruling R7). John may veto by opening an issue.
 
 ## Context
@@ -161,6 +161,89 @@ could not.
 - D7: DSL literals with `pub` and defaults.
 - D8: vtables, type descriptors and the link-time check.
 
+## Amendment 1: inheritance instead of interfaces (issue #5, 2026-11-14)
+
+John asked for "inheritance instead of something like protocols in swift, or extensions in ruby … we don't have
+'final' classes, even for built-in classes", so that the implementation of a function "is either on this class, or
+one of the classes inherited from". He also added the **3 am test** to G1 (`docs/PROCESS.md`). Process record:
+`0005-research/inherit/` (criteria, research, ideas, analysis, `review-h1.md`, scores). Example:
+`docs/examples/types/inherit/` (parser, 3 am resolver, checker with 73 bad files, C dispatch models run under ASan).
+
+**This replaces rules 6–10, 15 and 17, and the `impl` parts of rule 16.** `iface` and `impl` no longer exist.
+
+1. **Single inheritance.** `type Button is Labelled { … }`, with one parent. Nothing is final.
+2. **Overrides.** `override fn m(…)` is required to override, and it is an error if no ancestor has `m`. A method
+   with an ancestor's name but no `override` is an error, so there is no hiding.
+   - **Signature:** an override matches the base exactly (parameter names and types, return type, `fails`, receiver
+     mode, `pub`) and doesn't restate defaults.
+   - **`super`:** `super.m(…)` is allowed only inside `override fn m`.
+3. **Abstract methods** have no body. A type with any abstract method can't be built except by its own static
+   functions, which make its *base part*.
+4. **Exact plain types.**
+   - A plain `Base` value, parameter or field is exactly `Base`. Only `dyn Base` holds a subclass, boxed at store
+     sites as in rule 8, so slicing can't happen ("write `dyn Base`").
+   - `Pool of dyn Widget` and `Handle of dyn Widget` hold subclasses; `Pool of Button` holds only Buttons.
+   - Inside a method of `C`, `self` is a borrowed `dyn C`: it may be passed to `dyn` parameters, and is never
+     assigned or returned whole as a plain type.
+5. **Open recursion.** `self.m()` and calls on `dyn` values dispatch on the object's actual class. Calls on plain
+   values are static, and the compiler emits direct calls for them.
+6. **Construction.**
+   - A subclass literal takes its parent part as one value: `Badge(super: try Labelled.new(label: "x"), count: 3)`.
+   - The parent's fields stay private to its module and subclasses, and its validation always runs.
+   - No object exists until every field is set, so no overridable method runs on a partly built object.
+7. **Drops and `take self`.** Subclass fields drop first, then the parent's. Each class descriptor has a tail drop,
+   so an inherited `take self` method also drops a subclass's fields. In a `take self` override, `super.m()` gets
+   `self` whole: nothing is moved out before it, and nothing is used after it.
+8. **Capabilities.** `type Shape is copy, equals, show` puts capabilities on a base type.
+   - Derived per exact class, dispatched through the vtable, never overridable.
+   - Two values are equal only if they are of the same class.
+   - A subclass whose fields lack a required capability is an error.
+9. **Built-ins.**
+   - **Classes:** containers and `Str` can be subclassed (`type LoggedNames is List of Str`).
+   - **Values, not classes:** `Int`, `Float`, `Bool`, enums, `Optional`, tuples and `Handle`.
+   - **Primitive sets:** each built-in class documents a primitive set (List: `push`, `insert`, `remove_at`, `get`,
+     `set`, `len`). For subclass instances, every other method goes through the primitives dynamically, so overriding
+     `push` also catches `push_all`. An exact `List` keeps the direct path. Indexing, `for`, list patterns and `+=`
+     map to primitives (`inherit/NOTES.md`).
+   - **Not yet subclassable:** Map, Set, Str and the others, until their primitive sets are written (D10).
+10. **The choosing rule** (replaces rule 15):
+    - a closed set you own is an `enum`;
+    - a set others extend is a base type plus `dyn Base`;
+    - a single callback is a closure field.
+11. **Whole-program checks** (rule 9, ADR-0003). They analyse each exact receiver class. A `dyn` call, and a self-call
+    reached through `dyn`, count every override in the linked program, and the error names the override.
+12. **Two roles** (a widget that is also saveable) use a field plus forwarding methods for now.
+    **Issue #6 asks John** whether extra parents with only abstract methods are allowed (recommended yes; adding them
+    later breaks nothing).
+13. **Tooling for the 3 am test.**
+    - **Overrides:** `override` makes every override one grep, and the compiler lists the overrides of any method.
+    - **Traces and debugger:** both show the concrete class.
+    - **API changes:** the API summary records each public method's self-call set, and `deps api-diff` (ADR-0009)
+      flags a changed set or an added method as breaking.
+    - **Warnings:** a self-call cycle through overrides; a hierarchy deeper than about 5.
+
+**What the examples showed:**
+- **Dynamic-down share:**
+  - H1b with exact-receiver analysis: 25 of 58 calls (43%);
+  - the old interface design on the same benchmark: 10 of 25 (40%).
+- **Closed recursion (H2, H3):** three of four pushes went uncounted, silently.
+- **Two-roles workaround:** it can't reach the saveable side once the value is a `dyn Widget`.
+
+| Option | 3 am 25 | Owner 20 | Safety 15 | Simple 15 | Ext 10 | Fit 10 | Impl 5 | Total |
+|---|---|---|---|---|---|---|---|---|
+| **H1b** (loop 2) | 3.5 | 4.5 | 4 | 3.5 | 3 | 4 | 3.5 | **75.5** |
+| H3 single, closed (review) | 3.5 | 4 | 3.5 | 3.5 | 3 | 3.5 | 3.5 | 71 |
+| H2 stateless parents, closed (review) | 3.5 | 3.5 | 3.5 | 3 | 4.5 | 3 | 3 | 69 |
+
+- **H1b leads by 4.5,** a tie under PROCESS. It also leads (73.5 to 70) with the 3 am test weighted 35.
+- **The tie-break:** the silent miscount under closed recursion can't be fixed by a subclass author, while H1b's
+  risks are made loud by tooling.
+- **Traded away:**
+  - 3 points of downward lookups;
+  - the fragile-base-class risk, now handled by tooling;
+  - two roles, pending issue #6;
+  - subclasses can't be passed where a plain base is expected.
+
 ## Syntax budget impact
 
 | Item | Count |
@@ -174,4 +257,5 @@ could not.
 
 | Review | Findings | Outcome |
 |---|---|---|
+| `0005-research/inherit/review-h1.md` (amendment 1, Fable 5.2) | F1 slicing via `self`; F2 subclass construction with private fields; F3 `take self` drops; S1 3 am share; S2 fragile base; S3 built-ins closed; S4 exact types; S5 fan-out; S6 two roles; S7 override matching | All fixed in H1b (loop 2) except S6, which is issue #6 |
 | `0005-research/review-t3plus.md` | F1 `dyn` hides the call graph (fatal); S1 bare names; S2 boxing `dyn` parameters; S3 no defaults; S4 four polymorphism forms; S5 `dyn` lacks copy, equality and printing; S6 receiver modes; S7 construction for DSLs; S8 where methods live; plus minor points | All adopted as rules 1–16 |

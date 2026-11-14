@@ -65,10 +65,12 @@ Use this for every design decision (ruling R8). Claude may edit this file to imp
 - **Always build the do-nothing baseline as a finalist.** In ADR-0007 it was named "the baseline to beat" but only built after the review, and it tied. Also have the examples declare every library signature they call, because undeclared libraries hid a fatal typing gap.
 - **Run the real tool on every OS before scoring.** In ADR-0008 the pre-review leader (K1) lost after cdb ran on Windows: its debug info was wrong under the Win64 ABI, and a PDB type dump had hidden it. A file dump is not a debugger session.
 - **Attack the shared helper, not just the winner.** In ADR-0009 most of the review's fatal findings were in `common.py`, which all three finalists shared, so the scores had overrated all of them equally.
+- **Measure the 3 am cost against the current design, with the same tool.** In amendment 1 the first count (52% downward lookups) looked like a large cost. Counting the old interface corpus with the same resolver, plus exact-receiver analysis, gave 43% against 40%.
 - **A GUI example is too big.** Use a small scripted simulation that has the same lifetimes (see `docs/examples/chatsim/SPEC.md`).
 
 ## Changelog
 
+- 2026-11-14: lesson from ADR-0005 amendment 1 (measure against the current design).
 - 2026-11-14: the 3 am test added to the meaning of simple (John, issue #5).
 - 2026-11-14: lesson from ADR-0009's retro (shared helpers).
 - 2026-11-14: lesson from ADR-0008's retro (real debugger sessions on every OS).

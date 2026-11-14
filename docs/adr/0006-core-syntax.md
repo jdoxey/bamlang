@@ -113,6 +113,12 @@ See `0006-research/lessons-and-scores.md` and `review-p3.md`.
 **Keywords.** 28 words are truly reserved: `pub const type enum iface impl for fn let var if else while in match return fail break continue try or and not mut self true false none`. These are contextual and usable as names elsewhere:
 `desc asc to of context crew lock with drop take is dyn fails module use as`. After `.`, any word is a member name.
 
+**Amendment 2 (ADR-0005 amendment 1, issue #5).**
+- `iface` and `impl` are no longer keywords, which leaves 26 reserved words.
+- `override` and `super` join the contextual words.
+- `type Name is Parent {` declares a parent; `is` already introduced capabilities, and a capitalised name after `is` is the parent.
+- The parser is `docs/examples/types/inherit/parser.py`.
+
 **Tooling.**
 - **Formatter:** one mandated formatter, with `fmt --check` in CI. The parser doesn't reject non-canonical layout.
 - **Error recovery:** on the error path only, indentation names the likely opener of an unclosed `{` or `(`.

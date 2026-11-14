@@ -2,13 +2,13 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** issue #5 (inheritance): clarification pass on the chosen design H1 (single inheritance, required `override`), then amend ADR-0005. D10 waits.
+- **Now:** D10, standard library v1 scope (Light). Issue #5 done: ADR-0005 amendment 1 (single inheritance, `override` required, nothing final).
 - **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes), 0009 dependencies (git paths, MVS, hashed, no build scripts). Veto by opening an issue.
 - **Needs you (optional yes/no):** issue #6 (may a type have extra abstract-only parents? I recommend yes; not blocking). Also: may CI download a SHA-pinned llvm-mingw (182 MB) to test replacing the 6–7 GB VS Build Tools on Windows? I recommend yes.
 
 ## Next action
 
-**Issue #5 first:** amendment 1 to ADR-0005 (`docs/adr/0005-research/inherit/`), Full tier. John's direction is fixed: implementation inheritance, no `final` (built-ins included), no protocols or extensions. Decide single or multiple inheritance, overriding rules, `dyn Base`, built-in subclassing, and what replaces `iface`/`impl`; score with the 3 am test. Then D10.
+D10 also writes the primitive sets for Map, Set, Str and the other container classes (ADR-0005 amendment 1, rule 9).
 
 
 **D10** (ADR-0010, Light: one pass, no subagents, ADR under 60 lines). Inputs that earlier ADRs passed on:
@@ -36,6 +36,8 @@ Then D11 (testing, coverage, debugger tooling; Light) and D12 (name; Light), the
 - **D9 toolchain spike (T2 llvm-mingw, T3 zig cc on Windows):** the session's permission check denied an agent that would download and run third-party toolchain binaries in CI. Not retried. T1 (system clang, already green on all three OSes in ADR-0008's CI) is the v1 default until John allows the downloads; see ADR-0009.
 
 ## Log
+
+- 2026-11-14: issue #5 handled (ADR-0005 amendment 1: inheritance; issue #6 asked about abstract-only parents).
 
 - 2026-11-14: D9 done (ADR-0009 Accepted after two loops; B1+ over B2+ on the major-break scenario).
 
