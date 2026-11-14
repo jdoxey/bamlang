@@ -7,13 +7,9 @@
 
 ## Context
 
-G8, G9 and G10 ask for debugging, coverage and unit testing tools. The mechanisms already exist:
-- test suites as data, with case paths (ADR-0007);
-- `expect_trap`, and traps caught only at tests and crews (ADR-0004);
-- clang debug info, gdb/lldb/cdb sessions and the llvm-cov remap (ADR-0008);
-- the command set (ADR-0009).
-
-This ADR fixes the user-facing tools. They are cheap to change, so the decision is Light.
+G8, G9 and G10 ask for debugging, coverage and unit testing tools. The mechanisms exist already: test suites as data
+(0007), `expect_trap` (0004), debug info and the llvm-cov remap (0008), and the commands (0009). This ADR fixes the
+user-facing tools; they are cheap to change, so it is Light.
 
 ## Decision
 
@@ -57,8 +53,5 @@ This ADR fixes the user-facing tools. They are cheap to change, so the decision 
 
 ## Consequences
 
-- **What it gives:** one command each for testing, coverage and debugging, the same on three OSes. Failures name the
-  case path and the source line.
-- **What it costs:** `here` defaults are a small new rule (ADR-0006 grammar: `= here` in a parameter default), and
-  formatters must be kept in step with layouts.
-- **CI check:** M7's exit test covers all of this.
+One command each for testing, coverage and debugging, the same on three OSes; failures name the case path and line.
+Costs: the `here` default is a small new rule, and formatters must track layouts. M7's exit test covers all of this.
