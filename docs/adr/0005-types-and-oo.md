@@ -212,9 +212,11 @@ one of the classes inherited from". He also added the **3 am test** to G1 (`docs
     - a single callback is a closure field.
 11. **Whole-program checks** (rule 9, ADR-0003). They analyse each exact receiver class. A `dyn` call, and a self-call
     reached through `dyn`, count every override in the linked program, and the error names the override.
-12. **Two roles** (a widget that is also saveable) use a field plus forwarding methods for now.
-    **Issue #6 asks John** whether extra parents with only abstract methods are allowed (recommended yes; adding them
-    later breaks nothing).
+12. **Two roles** (a widget that is also saveable) use a field plus forwarding methods, and there is no other
+    mechanism. **John answered issue #6 "no"** to extra abstract-only parents: declaring a type `Savable` is a
+    contract, which is the protocol idea he excluded. The cost is recorded below: a role is unreachable through a
+    `dyn` base that doesn't declare it, so a base type that needs a role across all its subclasses declares it as an
+    abstract method itself.
 13. **Tooling for the 3 am test.**
     - **Overrides:** `override` makes every override one grep, and the compiler lists the overrides of any method.
     - **Traces and debugger:** both show the concrete class.
@@ -241,7 +243,7 @@ one of the classes inherited from". He also added the **3 am test** to G1 (`docs
 - **Traded away:**
   - 3 points of downward lookups;
   - the fragile-base-class risk, now handled by tooling;
-  - two roles, pending issue #6;
+  - two roles: forwarding only (issue #6: no);
   - subclasses can't be passed where a plain base is expected.
 
 ## Syntax budget impact
@@ -257,5 +259,5 @@ one of the classes inherited from". He also added the **3 am test** to G1 (`docs
 
 | Review | Findings | Outcome |
 |---|---|---|
-| `0005-research/inherit/review-h1.md` (amendment 1, Fable 5.2) | F1 slicing via `self`; F2 subclass construction with private fields; F3 `take self` drops; S1 3 am share; S2 fragile base; S3 built-ins closed; S4 exact types; S5 fan-out; S6 two roles; S7 override matching | All fixed in H1b (loop 2) except S6, which is issue #6 |
+| `0005-research/inherit/review-h1.md` (amendment 1, Fable 5.2) | F1 slicing via `self`; F2 subclass construction with private fields; F3 `take self` drops; S1 3 am share; S2 fragile base; S3 built-ins closed; S4 exact types; S5 fan-out; S6 two roles; S7 override matching | All fixed in H1b (loop 2); S6 settled by John on issue #6 (no extra parents) |
 | `0005-research/review-t3plus.md` | F1 `dyn` hides the call graph (fatal); S1 bare names; S2 boxing `dyn` parameters; S3 no defaults; S4 four polymorphism forms; S5 `dyn` lacks copy, equality and printing; S6 receiver modes; S7 construction for DSLs; S8 where methods live; plus minor points | All adopted as rules 1–16 |
