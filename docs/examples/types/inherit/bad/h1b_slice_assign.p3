@@ -1,0 +1,8 @@
+# expect: write `dyn Base`
+type Base { pub n: Int }
+type Sub is Base { pub extra: Int }
+fn main() {
+  var b = Base(n: 0)
+  let s = Sub(super: Base(n: 1), extra: 2)
+  b = s
+}

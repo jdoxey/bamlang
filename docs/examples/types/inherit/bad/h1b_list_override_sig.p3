@@ -1,0 +1,4 @@
+# expect: parameter `x` is `Int`, the base has `Str`
+type Names is List of Str {
+  pub override fn push(mut self, x: Int) { }
+}

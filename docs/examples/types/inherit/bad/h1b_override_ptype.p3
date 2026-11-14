@@ -1,0 +1,3 @@
+# expect: parameter `x` is `Str`, the base has `Int`
+type Base { pub fn n(self, x: Int) -> Int { return x } }
+type Sub is Base { pub override fn n(self, x: Str) -> Int { return 1 } }

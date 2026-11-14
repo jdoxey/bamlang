@@ -1,0 +1,23 @@
+# S2 demo, version 1 of a library base type. `close` calls the overridable steps kind() and text().
+module core {
+  type Widget {
+    pub fn close(take self) -> Str
+  }
+  type Labelled is Widget {
+    label: Str
+    pub fn new(label: Str) -> Labelled { return Labelled(label: label) }
+    pub fn kind(self) -> Str
+    pub fn text(self) -> Str { return self.label }
+    pub override fn close(take self) -> Str { return "{self.kind()} {self.text()}" }
+  }
+}
+module plugin {
+  use core.Labelled
+  # the plugin author relied on `close` using text(): the closing report shows the count
+  type Badge is Labelled {
+    count: Int
+    pub fn new(label: Str, count: Int) -> Badge { return Badge(super: Labelled.new(label: label), count: count) }
+    pub override fn kind(self) -> Str { return "Badge" }
+    pub override fn text(self) -> Str { return "{self.label} x{self.count}" }
+  }
+}

@@ -1,0 +1,64 @@
+== F3 take self and drops (dyn Labelled; a tail-drop per class descriptor) ==
+render: Badge inbox x3 mail
+render: Tag beta
+render: Button OK
+close Badge (override calls super.close()):
+  closing badge 3
+  drop Badge.icon
+  drop Labelled.label
+closed: Badge inbox x3 mail
+close Tag (inherited close):
+  drop Tag.icon
+  drop Labelled.label
+closed: Tag beta
+close Button:
+  drop Labelled.label
+closed: Button OK
+into_label on a Badge (moves label out; the tail still drops):
+  drop Badge.icon
+moved label = note
+plain drop of a Tag (subclass fields first):
+  drop Tag.icon
+  drop Labelled.label
+== F1 virtual copy and per-class equals ==
+copy of a Badge is a Badge, equals original: yes
+Button OK equals Tag OK: no (same label, different exact class)
+  drop Badge.icon
+  drop Labelled.label
+  drop Badge.icon
+  drop Labelled.label
+  drop Labelled.label
+  drop Tag.icon
+  drop Labelled.label
+== S5 exact receiver: direct calls, no vtable ==
+exact: [  Button Exact]  dyn: [  Button Exact]  same: yes
+  drop Labelled.label
+== S3 LoggedNames: push_all goes through the push primitive ==
+a.push(a)
+  log push a
+a.push_all([b, c])
+  log push b
+  log push c
+a = [a b c]
+c.push_all([x, y])   (CountedNames overrides push only)
+  log push x
+  log push y
+c.n = 2
+fill(dyn List c, [w])
+  log push w
+c.n = 3
+c = [x y w]
+exact List p.push_all([p, q]):
+primitive slot calls = 0 (direct path)
+p = [p q]
+LoggedNames t.push_all([p, q]):
+  log push p
+  log push q
+primitive slot calls = 2 (through push)
+== S3 SortedNames: push and insert keep the order through every derived method ==
+s after push_all([pear, apple, fig]) = [apple fig pear]
+s after insert(at: 0, zebra) = [apple fig pear zebra]
+s after retain(not fig) = [apple pear zebra]
+s.pop() = zebra
+s = [apple pear]
+sorted: yes

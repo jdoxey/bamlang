@@ -1,0 +1,6 @@
+# expect: write `dyn Base`
+type Base {
+  pub n: Int
+  pub fn me(take self) -> Base { return self }
+}
+type Sub is Base { pub extra: Int }

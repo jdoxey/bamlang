@@ -1,0 +1,8 @@
+# expect: `super.m()` is only allowed inside `override fn m`
+type Base {
+  pub fn a(self) -> Int { return 1 }
+  pub fn b(self) -> Int { return 2 }
+}
+type Sub is Base {
+  pub override fn a(self) -> Int { return super.b() }
+}

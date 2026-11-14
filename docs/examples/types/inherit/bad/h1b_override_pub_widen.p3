@@ -1,0 +1,3 @@
+# expect: the base is not `pub`, so the override must be not `pub`
+type Base { fn n(self) -> Int { return 1 } }
+type Sub is Base { pub override fn n(self) -> Int { return 2 } }

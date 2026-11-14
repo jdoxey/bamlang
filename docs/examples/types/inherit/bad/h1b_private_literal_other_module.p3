@@ -1,0 +1,5 @@
+# expect: field `n` is private to module `core`
+module core {
+  type Base { n: Int }
+}
+fn main() { let b = Base(n: 1) }

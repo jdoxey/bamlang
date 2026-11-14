@@ -1,0 +1,11 @@
+# expect: as a statement of the method body
+type Base {
+  pub fn close(take self) -> Str { return "base" }
+}
+type Sub is Base {
+  flag: Bool
+  pub override fn close(take self) -> Str {
+    if self.flag { return super.close() }
+    return "no"
+  }
+}

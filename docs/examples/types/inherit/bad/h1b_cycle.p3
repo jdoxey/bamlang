@@ -1,0 +1,8 @@
+# expect-warning: self-call cycle
+type Base {
+  pub fn push(mut self, x: Int) { }
+  pub fn push_all(mut self, xs: List of Int) { for x in xs { self.push(x: x) } }
+}
+type Sub is Base {
+  pub override fn push(mut self, x: Int) { self.push_all(xs: [x]) }
+}

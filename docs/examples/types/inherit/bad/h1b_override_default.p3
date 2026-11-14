@@ -1,0 +1,3 @@
+# expect: restates a default
+type Base { pub fn n(self, x: Int = 3) -> Int { return x } }
+type Sub is Base { pub override fn n(self, x: Int = 3) -> Int { return 2 } }

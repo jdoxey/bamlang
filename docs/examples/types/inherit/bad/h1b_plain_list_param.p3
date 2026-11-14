@@ -1,0 +1,7 @@
+# expect: write `dyn List`
+type Names is List of Str { pub override fn push(mut self, x: Str) { super.push(x: x) } }
+fn count(xs: List of Str) -> Int { return xs.len() }
+fn main() {
+  let n = Names()
+  count(xs: n)
+}

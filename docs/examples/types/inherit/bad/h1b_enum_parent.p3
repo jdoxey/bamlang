@@ -1,0 +1,3 @@
+# expect: is a value type, not a class
+enum Color { Red, Green }
+type Shade is Color { }

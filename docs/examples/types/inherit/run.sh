@@ -1,5 +1,5 @@
 #!/bin/sh
-# Inheritance finalists H1/H2/H3 (ADR-0005 amendment 1, step 3). Run: bash run.sh   (Linux, macOS, Git Bash on Windows)
+# Inheritance finalists H1/H2/H3 (ADR-0005 amendment 1, step 3) and H1b = H1 + the review fixes (clarification pass). Run: bash run.sh   (Linux, macOS, Git Bash on Windows)
 # 1 parse the corpora and the p3n corpus  2 checker bad files  3 3 am resolver + pinned table  4 C models vs expected
 PY=$(command -v python3 || command -v python)
 CC=${CC:-clang}
@@ -14,7 +14,7 @@ tmp=$(mktemp -d 2>/dev/null || echo "${TMPDIR:-/tmp}/inherit.$$"); mkdir -p "$tm
 nocr() { tr -d '\r'; }
 
 # 1. parse -------------------------------------------------------------------
-for h in h1 h2 h3; do
+for h in h1 h2 h3 h1b; do
   if "$PY" parser.py "$h/types.p3" 2>"$tmp/err" | nocr > "$tmp/$h.ast" && [ ! -s "$tmp/err" ]; then
     echo "parse $h/types.p3: $(wc -l < "$h/types.p3" | tr -d ' ') lines, $(wc -l < "$tmp/$h.ast" | tr -d ' ') AST lines"
   else echo "FAIL parse $h/types.p3: $(nocr < "$tmp/err")"; fail=1; fi
@@ -28,6 +28,10 @@ for n in chatsim widgets errors tricky; do
 done
 if "$PY" parser.py "$P3N/corpus/types.p3" >/dev/null 2>"$tmp/err"; then echo "FAIL p3n types.p3 should fail (iface)"; fail=1
 else case "$(nocr < "$tmp/err")" in *"is removed"*) echo "p3n corpus: 4 files identical, types.p3 rejected (iface)" ;; *) echo "FAIL p3n types.p3: wrong error"; fail=1 ;; esac; fi
+
+for f in h1b/api_v1.p3 h1b/api_v2.p3; do
+  if ! "$PY" parser.py "$f" >/dev/null 2>"$tmp/err"; then echo "FAIL parse $f: $(nocr < "$tmp/err")"; fail=1; fi
+done
 
 # 2. bad files ---------------------------------------------------------------
 nbad=0
@@ -66,20 +70,33 @@ nocr < "$tmp/res" > "$tmp/res.lf"
 if [ $rc -ne 0 ]; then echo "FAIL resolve --all: $(nocr < "$tmp/reserr")"; fail=1; fi
 grep -v 'warning:' "$tmp/res.lf" > "$tmp/table"
 if diff expected/table.txt "$tmp/table" >/dev/null; then cat "$tmp/table"; else echo "FAIL resolver table differs from expected/table.txt"; diff expected/table.txt "$tmp/table"; fail=1; fi
+# S2: the API summary and the v1 -> v2 diff (exit 1 = breaking changes found)
+"$PY" resolve.py --api-diff h1b/api_v1.p3 h1b/api_v2.p3 2>"$tmp/err" | nocr > "$tmp/apidiff"
+if diff expected/api_diff.txt "$tmp/apidiff" >/dev/null; then echo "api-diff v1 -> v2: $(wc -l < "$tmp/apidiff" | tr -d ' ') breaking changes flagged"
+else echo "FAIL api-diff differs from expected/api_diff.txt"; diff expected/api_diff.txt "$tmp/apidiff"; fail=1; fi
+if "$PY" resolve.py --api-diff h1b/api_v1.p3 h1b/api_v1.p3 >/dev/null; then :; else echo "FAIL api-diff of identical files reported a change"; fail=1; fi
 # warnings: H1 has none (open recursion); H2 and H3 each warn once (CountedNames.push is bypassed by LoggedAll.push_all)
-for h in h1:0 h2:1 h3:1; do
+for h in h1:0 h2:1 h3:1 h1b:0; do
   n=$(grep -c "^${h%%:*}: warning:" "$tmp/res.lf")
   if [ "$n" != "${h#*:}" ]; then echo "FAIL ${h%%:*}: $n warnings, expected ${h#*:}"; fail=1; fi
 done
 
 # 4. C models -------------------------------------------------------------------
-for n in h1 h2 h3; do
+for n in h1 h2 h3 h1b; do
   if ! "$CC" -std=c11 -Wall -Wextra -D_CRT_SECURE_NO_WARNINGS -o "$tmp/$n$EXE" "cmodel/$n.c" 2>"$tmp/cc"; then echo "FAIL build $n: $(cat "$tmp/cc")"; fail=1; continue; fi
   [ -s "$tmp/cc" ] && echo "note: $n compiled with warnings: $(head -3 "$tmp/cc")"
   "$tmp/$n$EXE" 2>&1 | nocr > "$tmp/$n.txt"
   if nocr < "cmodel/$n.txt" | diff - "$tmp/$n.txt" >/dev/null; then echo "cmodel $n: transcript matches ($(wc -l < "$tmp/$n.txt" | tr -d ' ') lines)"
   else echo "FAIL cmodel $n: transcript differs"; nocr < "cmodel/$n.txt" | diff - "$tmp/$n.txt" | head -10; fail=1; fi
 done
+# 5. the h1b model under AddressSanitizer + LeakSanitizer (Linux only, when the compiler has them): no leak, no double free
+if [ "$(uname -s 2>/dev/null)" = Linux ]; then
+  if "$CC" -std=c11 -g -fsanitize=address,undefined -fno-omit-frame-pointer -o "$tmp/h1b_asan" cmodel/h1b.c 2>/dev/null; then
+    if ASAN_OPTIONS=detect_leaks=1 "$tmp/h1b_asan" 2>"$tmp/asan.err" | nocr > "$tmp/asan.out" && [ ! -s "$tmp/asan.err" ] \
+       && diff cmodel/h1b.txt "$tmp/asan.out" >/dev/null; then echo "cmodel h1b under ASan/LSan/UBSan: clean"
+    else echo "FAIL cmodel h1b under sanitizers: $(head -5 "$tmp/asan.err")"; fail=1; fi
+  else echo "note: sanitizers unavailable with $CC, skipped"; fi
+fi
 rm -rf "$tmp"
 if [ $fail -ne 0 ]; then exit 1; fi
 echo "inherit examples OK"

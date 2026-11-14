@@ -1,0 +1,8 @@
+# expect: write `dyn Button`
+type Button { pub n: Int }
+type Badge is Button { pub extra: Int }
+fn main() {
+  var p: Pool of Button = Pool of Button()
+  let b = Badge(super: Button(n: 1), extra: 2)
+  let h = p.add(value: b)
+}

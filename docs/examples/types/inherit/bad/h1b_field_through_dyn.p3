@@ -1,0 +1,3 @@
+# expect: fields are not reachable through `dyn Base`
+type Base { pub n: Int }
+fn main(d: dyn Base) { print(text: "{d.n}") }

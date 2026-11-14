@@ -1,0 +1,359 @@
+# types under H1b = H1 + the review fixes (docs/adr/0005-research/inherit/review-h1.md).
+#  F1  a plain `Base` is EXACTLY Base (no slicing); only `dyn Base` holds subclasses; `self` is a borrowed `dyn C`.
+#  F2  a subclass literal takes its base part as ONE value: `Sub(super: try Base.new(..), extra: 1)`. Base fields stay private to
+#      the base's module and its subclasses (in any module); `Panel.children` and `Labelled.label` are private again.
+#  F3  `take self` methods drop their unmoved fields and then the subclass tail (cmodel/h1b.c); `super.close()` gets `self` whole.
+#  S3  List's primitive set is push/insert/remove_at/get/set/len; push_all, pop, retain... go through them for subclass instances.
+#  S7  overrides match the base exactly (names, types, return, fails, receiver, pub), restate no defaults; super.m() only in
+#      `override fn m`; show/copy/equals/hash are derived per exact class and are not overridable.
+# Everything else is H1: one parent, `override` required, self-calls are open (dynamic).
+
+module core {
+  # B1. Shape: a set OTHERS extend -> abstract base + dyn Shape
+  type Shape is show {
+    pub fn area(self) -> Float
+    pub fn name(self) -> Str
+    pub fn describe(self) -> Str {
+      return "{self.name()} {self.area():.2}"          # open self-calls: any subclass body can run
+    }
+    pub fn intersects(self, other: dyn Shape) -> Bool {
+      return self.area().sqrt() + other.area().sqrt() > 5.0
+    }
+  }
+
+  type Circle is Shape {
+    r: Float
+
+    pub fn new(r: Float) -> Circle fails {
+      if r <= 0.0 { fail "bad radius {r}" }
+      return Circle(r: r)
+    }
+    pub override fn area(self) -> Float { return PI * self.r * self.r }
+    pub override fn name(self) -> Str { return "circle" }
+  }
+
+  type Rect is Shape {
+    w: Float
+    h: Float
+
+    pub fn new(w: Float, h: Float) -> Rect fails {
+      if w <= 0.0 or h <= 0.0 { fail "bad size {w}x{h}" }
+      return Rect(w: w, h: h)
+    }
+    pub override fn area(self) -> Float { return self.w * self.h }
+    pub override fn name(self) -> Str { return "rect" }
+  }
+
+  # B2. Widget: open set of kinds, containers included.
+  pub enum Event { Click, Drag(dx: Int), Close }
+  const FOCUS = "focus moves to next"
+
+  type Widget {
+    pub fn render(self, depth: Int) -> Str
+    pub fn event(mut self, path: List of Int, ev: Event) -> Str
+    pub fn close(take self) -> Str
+    pub fn focus_next(self) -> Str { return FOCUS }
+    pub fn describe(self) -> Str { return "widget" }
+  }
+
+  pub fn route(mut children: List of dyn Widget, path: List of Int, ev: Event) -> Str {
+    match (path, ev) {
+      ([], _) => return "ignored"
+      ([i], Close) if i < children.len() => {
+        let c = children.take_out(at: i)
+        return "consumed {c.close()}; {FOCUS}"
+      }
+      ([i, ..rest], _) => return match children.get_mut(at: i) { some(c) => c.event(path: rest, ev), none => "no such widget" }
+      _ => return "ignored"
+    }
+  }
+
+  # `children` is private again: core and every subclass (Tabs, in the plugin module) can use it; nobody else can.
+  type Panel is Widget {
+    children: List of dyn Widget
+
+    pub fn new(children: List of dyn Widget) -> Panel { return Panel(children: children) }
+    pub override fn render(self, depth: Int) -> Str {
+      var out = "{indent(levels: depth)}Panel\n"
+      for c in self.children { out += c.render(depth: depth + 1) }
+      return out
+    }
+    pub override fn event(mut self, path: List of Int, ev: Event) -> Str { return route(children: self.children, path, ev) }
+    pub override fn close(take self) -> Str { return "Panel[{self.children.map(each: fn(c) { c.close() }).join(sep: ", ")}]" }
+  }
+
+  # (c) template method. Labelled is abstract (kind, event); its static `new` builds the BASE PART that a subclass literal
+  # takes as `super:`. `label` is private; `title()` is the read access.
+  type Labelled is Widget, copy, equals, show {
+    label: Str
+
+    pub fn new(label: Str) -> Labelled fails {
+      if label == "" { fail "empty label" }
+      return Labelled(label: label)                    # allowed: an abstract literal inside its own static fn = a base part
+    }
+    pub fn kind(self) -> Str
+    pub fn title(self) -> Str { return self.label }
+    pub fn text(self) -> Str { return self.label }
+    pub fn preview(self) -> Str { return show_widget(w: self) }          # `self` is a borrowed `dyn Labelled`: fine for `dyn Widget`
+    pub fn twin(self) -> dyn Labelled { return self.copy() }             # copy of `self` is virtual: an owned `dyn Labelled`
+    pub override fn render(self, depth: Int) -> Str { return "{indent(levels: depth)}{self.kind()} {self.text()}\n" }
+    pub override fn close(take self) -> Str { return "{self.kind()} {self.text()}" }
+    pub fn into_label(take self) -> Str { return self.label }            # moves `label` out; the subclass tail is still dropped
+  }
+
+  type Button is Labelled {
+    pub fn new(label: Str) -> Button fails { return Button(super: try Labelled.new(label: label)) }
+    pub override fn kind(self) -> Str { return "Button" }
+    pub override fn event(mut self, path: List of Int, ev: Event) -> Str {
+      match ev {
+        Click => return "pressed {self.label}; {self.focus_next()}"
+        _ => return "ignored"
+      }
+    }
+  }
+
+  # B3. Money and Account: no hierarchy
+  type Money {
+    cents: Int
+
+    pub fn new(cents: Int) -> Money fails {
+      if cents < 0 { fail "negative money {cents}" }
+      return Money(cents: cents)
+    }
+    pub fn cents(self) -> Int { return self.cents }
+    pub fn plus(self, o: Money) -> Money { return Money(cents: self.cents + o.cents) }
+    pub fn minus(self, o: Money) -> Optional of Money {
+      if o.cents > self.cents { return none }
+      return some(value: Money(cents: self.cents - o.cents))
+    }
+  }
+
+  type Account {
+    owner: Str
+    balance: Money
+
+    pub fn new(owner: Str, balance: Money) -> Account fails {
+      if owner == "" { fail "empty owner" }
+      return Account(owner: owner, balance: balance)
+    }
+    pub fn deposit(mut self, m: Money) { self.balance = self.balance.plus(o: m) }
+    pub fn withdraw(mut self, m: Money) fails {
+      match self.balance.minus(o: m) {
+        some(b) => { self.balance = b }
+        none    => fail "insufficient funds: balance {self.balance.cents()}, need {m.cents()}"
+      }
+    }
+  }
+
+  pub fn transfer(mut pool: Pool of Account, a: Handle of Account, b: Handle of Account, m: Money) fails {
+    with src = pool[a] { try src.withdraw(m) }
+    with dst = pool[b] { dst.deposit(m) }
+  }
+
+  type Saveable {
+    pub fn save(self) -> Str
+    pub fn describe(self) -> Str { return "saveable {self.save()}" }
+  }
+
+  pub fn show_widget(w: dyn Widget) -> Str { return w.render(depth: 0) }
+}
+
+module plugin {
+  use core.Shape
+  use core.Widget
+  use core.Panel
+  use core.Button
+  use core.Labelled
+  use core.Saveable
+
+  type Hexagon is Shape {
+    side: Float
+
+    pub fn new(side: Float) -> Hexagon fails {
+      if side <= 0.0 { fail "bad side {side}" }
+      return Hexagon(side: side)
+    }
+    pub override fn area(self) -> Float { return 3.0 * 3.0.sqrt() / 2.0 * self.side * self.side }
+    pub override fn name(self) -> Str { return "hexagon" }
+    pub fn grow(mut self, k: Float) { self.side = self.side * k }
+  }
+
+  type SliderSpec { pub value: Int, pub max: Int = 10 }
+
+  type Slider is Widget {
+    value: Int
+    max: Int
+
+    pub fn new(s: SliderSpec) -> Slider fails {
+      if s.value < 0 or s.value > s.max { fail "slider out of range" }
+      return Slider(value: s.value, max: s.max)
+    }
+    pub override fn render(self, depth: Int) -> Str { return "{indent(levels: depth)}Slider {self.value}/{self.max}\n" }
+    pub override fn event(mut self, path: List of Int, ev: Event) -> Str {
+      match ev {
+        Drag(d) => {
+          let old = self.value
+          self.value = clamp(value: old + d, low: 0, high: self.max)
+          return "value {old} -> {self.value}; {self.focus_next()}"
+        }
+        _ => return "ignored"
+      }
+    }
+    pub override fn close(take self) -> Str { return "Slider {self.value}/{self.max}" }
+  }
+
+  # a plugin container: a subclass of core's Panel, from ANOTHER module. Its base part is Panel.new(..); `children` is private
+  # to core, but a subclass may read it.
+  type Tabs is Panel {
+    pub fn new(children: List of dyn Widget) -> Tabs fails {
+      if children.is_empty() { fail "empty tabs" }
+      return Tabs(super: Panel.new(children: children))
+    }
+    pub override fn render(self, depth: Int) -> Str {
+      var out = "{indent(levels: depth)}Tabs\n"
+      for c in self.children { out += c.render(depth: depth + 1) }
+      return out
+    }
+    pub override fn close(take self) -> Str { return "Tabs[{self.children.map(each: fn(c) { c.close() }).join(sep: ", ")}]" }
+  }
+
+  # (c) a plugin subclass of core's abstract Labelled (private `label`): it overrides the step text() and owns a heap string.
+  type Badge is Labelled {
+    count: Int
+    icon: Str
+
+    pub fn new(label: Str, count: Int, icon: Str) -> Badge fails {
+      return Badge(super: try Labelled.new(label: label), count: count, icon: icon)
+    }
+    pub override fn kind(self) -> Str { return "Badge" }
+    pub override fn text(self) -> Str { return "{self.label} x{self.count} {self.icon}" }
+    pub override fn event(mut self, path: List of Int, ev: Event) -> Str { return "ignored" }
+    pub override fn close(take self) -> Str {
+      print(text: "closing badge {self.count}")
+      return super.close()                              # `self` whole; Labelled.close drops Badge.icon, then Labelled.label
+    }
+  }
+
+  # inherits close from Labelled: the inherited close still drops Tag.icon (the tail)
+  type Tag is Labelled {
+    icon: Str
+
+    pub fn new(label: Str, icon: Str) -> Tag fails { return Tag(super: try Labelled.new(label: label), icon: icon) }
+    pub override fn kind(self) -> Str { return "Tag" }
+    pub override fn event(mut self, path: List of Int, ev: Event) -> Str { return "ignored" }
+  }
+
+  # (a) a widget that is also serialisable. H1: one parent, so the second role is a field plus forwarding.
+  type ButtonSaver is Saveable {
+    label: Str
+    pub override fn save(self) -> Str { return "button:{self.label}" }
+  }
+
+  type SaveableButton is Widget {
+    button: Button
+
+    pub fn new(label: Str) -> SaveableButton fails { return SaveableButton(button: try Button.new(label: label)) }
+    pub override fn render(self, depth: Int) -> Str { return self.button.render(depth: depth) }
+    pub override fn event(mut self, path: List of Int, ev: Event) -> Str { return self.button.event(path: path, ev: ev) }
+    pub override fn close(take self) -> Str { return self.button.close() }
+    pub override fn describe(self) -> Str { return "saveable {self.button.describe()}" }
+    pub fn as_saveable(self) -> dyn Saveable { return ButtonSaver(label: self.button.title()) }   # a snapshot, not a view
+  }
+
+  # (b) subclassing a built-in. LoggedNames overrides ONE primitive; every derived method now logs through it (S3).
+  type LoggedNames is List of Str {
+    pub override fn push(mut self, x: Str) {
+      print(text: "log push {x}")
+      super.push(x: x)
+    }
+  }
+
+  type CountedNames is LoggedNames {
+    pub n: Int = 0
+    pub override fn push(mut self, x: Str) {
+      self.n += 1
+      super.push(x: x)
+    }
+  }
+
+  # keeps its elements sorted: push and insert are the primitives that add elements, so push_all, extend, `+=` keep the invariant
+  type SortedNames is List of Str {
+    pub override fn insert(mut self, at: Int, x: Str) {
+      var i = 0
+      while i < self.len() and self.get(at: i) ?? "" < x { i += 1 }
+      super.insert(at: i, x: x)
+    }
+    pub override fn push(mut self, x: Str) { self.insert(at: self.len(), x: x) }
+  }
+}
+
+fn save_all(items: List of dyn Saveable) -> Str {
+  var out = ""
+  for s in items { out += "{s.save()};" }
+  return out
+}
+
+fn fill(mut names: dyn List of Str, more: List of Str) { names.push_all(xs: more) }
+
+fn exact_only(b: Button) -> Str { return b.render(depth: 0) }          # exactly a Button; a Sub of Button does not fit
+fn any_widget(w: dyn Widget) -> Str { return w.render(depth: 0) }      # a Widget or any subclass
+
+fn b1() fails {
+  let c1 = try Circle.new(r: 1.0)
+  let h1 = try Hexagon.new(side: 2.0)
+  let r1 = try Rect.new(w: 2.0, h: 3.0)
+  let shapes: List of dyn Shape = [c1, h1, r1]
+  var total = 0.0
+  for s in shapes { print(text: s.describe()); total += s.area() }
+  print(text: "total {total:.2}")
+  eprint(text: "{shapes[0].intersects(other: shapes[1])} {shapes[1].show()}")
+}
+
+fn b2() fails {
+  let cancel = try Button.new(label: "Cancel")
+  let ok = try Button.new(label: "OK")
+  let slider = try Slider.new(s: SliderSpec(value: 3))
+  let inner = Panel.new(children: [cancel])
+  let kids: List of dyn Widget = [ok, slider, inner]
+  var root = Panel.new(children: kids)
+  print(text: "build"); print(text: root.render(depth: 0))
+  print(text: root.event(path: [0], ev: Click))
+  let x = try Button.new(label: "X")
+  let sb = try SaveableButton.new(label: "Save")
+  let saved: List of dyn Saveable = [sb.as_saveable()]
+  let tabs = try Tabs.new(children: [x, sb])
+  print(text: tabs.render(depth: 0))
+  print(text: save_all(items: saved))
+  let badge = try Badge.new(label: "inbox", count: 3, icon: "mail")
+  print(text: badge.render(depth: 0))
+  print(text: any_widget(w: badge))                     # Badge -> dyn Widget: boxed at the call
+  print(text: exact_only(b: ok))                        # Button -> Button: exact
+}
+
+fn b4() {
+  var a = LoggedNames()
+  a.push(x: "a")
+  a.push_all(xs: ["b", "c"])
+  var c = CountedNames()
+  c.push_all(xs: ["x", "y"])
+  c.push(x: "z")
+  fill(names: c, more: ["w"])
+  print(text: "n = {c.n}")
+  var s = SortedNames()
+  s.push_all(xs: ["pear", "apple", "fig"])
+  s.insert(at: 0, x: "zebra")
+}
+
+# S4. Pools: a plain `Pool of Button` holds exactly Buttons; `Pool of dyn Widget` holds any widget subclass.
+fn pools() fails {
+  var widgets: Pool of dyn Widget = Pool of dyn Widget()
+  let hb = widgets.add(value: try Button.new(label: "A"))
+  let hs = widgets.add(value: try Slider.new(s: SliderSpec(value: 1)))
+  let hg = widgets.add(value: try Badge.new(label: "B", count: 2, icon: "i"))
+  with w = widgets[hb] { print(text: w.render(depth: 0)) }          # dyn Widget: a dynamic-down call
+  with w = widgets[hg] { print(text: w.render(depth: 0)) }
+  var buttons: Pool of Button = Pool of Button()
+  let h1 = buttons.add(value: try Button.new(label: "C"))
+  with b = buttons[h1] { print(text: b.render(depth: 0)) }          # exactly Button: static
+  # buttons.add(value: badge) is rejected: a Badge is not exactly a Button (write `Pool of dyn Button`)
+}

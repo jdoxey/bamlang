@@ -1,0 +1,8 @@
+# expect: `self` is a borrowed `dyn
+type Base {
+  pub n: Int
+  pub fn keep(self) -> Int {
+    let mine = self
+    return 1
+  }
+}

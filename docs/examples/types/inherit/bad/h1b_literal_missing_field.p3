@@ -1,0 +1,5 @@
+# expect: no object exists until every field is set
+type Base { n: Int
+  pub fn new(n: Int) -> Base { return Base(n: n) } }
+type Sub is Base { pub extra: Int }
+fn main() { let s = Sub(super: Base.new(n: 1)) }

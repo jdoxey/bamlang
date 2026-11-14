@@ -10,8 +10,9 @@ author of these files; the script strips CR, adds `.exe`, and defines `_CRT_SECU
 | `parser.py` | copy of `../../syntax/p3n/parser.py` with the inheritance grammar (below) |
 | `h1/types.p3`, `h2/types.p3`, `h3/types.p3` | the benchmark (shapes, widgets, `Slider`, container `Tabs`, accounts) plus (a) `SaveableButton`, (b) `LoggedNames`, (c) template method `Labelled` |
 | `resolve.py` | per-finalist checker plus the 3 am resolver (`--rules h1\|h2\|h3 FILE [--detail]`, `--all DIR`) |
-| `bad/` | 36 bad files: `parse_*` (parser), `h1_*`, `h2_*`, `h3_*` (checker; `# expect:` error, `# expect-warning:`, `# expect-clean:`) |
-| `cmodel/h1.c h2.c h3.c` + `.txt` | C11 dispatch models and their expected transcripts |
+| `bad/` | 73 bad files: `parse_*` (parser), `h1_*`, `h2_*`, `h3_*`, `h1b_*` (checker; `# expect:` error, `# expect-warning:`, `# expect-clean:`) |
+| `cmodel/h1.c h2.c h3.c h1b.c` + `.txt` | C11 dispatch models and their expected transcripts (h1b also runs under ASan/LSan on Linux) |
+| `h1b/types.p3`, `h1b/api_v1.p3`, `h1b/api_v2.p3` | H1 with the review fixes (clarification pass, below); a v1/v2 pair for the API diff |
 
 ## Grammar additions (`parser.py`)
 - `type Name [is X, Y, ...] { ... }`. An item starting lowercase is a built-in capability, `(is show)`; an item starting
@@ -148,3 +149,127 @@ the overridable `push`.
   `dc->widget->kind(...)`; `super(Saveable).describe()` is a direct call.
 - All three also print `QuietButton` (overrides `focus_next`; `Button.click` calls `self.focus_next()`): H1 prints
   `focus stays`, H2/H3 print `focus moves to next` because `focus_next` is not a hook there.
+
+---
+
+# H1b: the clarification pass for H1 (review `docs/adr/0005-research/inherit/review-h1.md`)
+
+H2 and H3 are unchanged. `resolve.py --rules h1b` is H1 plus the checks below; `h1b/types.p3` (359 lines, H1 was 302) is the
+benchmark rewritten under it. `bash run.sh` ends with `inherit examples OK`. `parser.py` needed no change.
+
+## What changed, by review item
+| Item | Rule (checker unless noted) | Bad files (`bad/h1b_*`) |
+|---|---|---|
+| F1 | A plain `Base` is exactly Base; only `dyn Base` holds subclasses. Checked at call arguments, `let`/`var` with a type, assignment, `return`, list elements, `Pool.add`, `super:`. Inside a method of `C`, `self` has type `dyn C`: it fits `dyn C` or a `dyn` ancestor only; it can't be stored (`let`, assignment, field, list element); `return self` only from a `take self` method, only as `dyn`; `self.copy()` is virtual and returns an owned `dyn C` (needs `is copy`); `dyn` values expose methods, not fields. | slice_param, slice_let, slice_assign, slice_self_arg, slice_return_self, self_store, dyn_to_plain, plain_list_param, field_through_dyn |
+| F2 | `Sub(super: try Base.new(..), extra: 1)`: the base part is one value of exactly the parent type. `super:` is required when the parent chain has fields, rejected when it has none. A literal that names a base field is an error. Private fields (no `pub`) are visible in the declaring module and in subclasses in any module. No object exists until every field without a default is set. `Panel.children` and `Labelled.label` are private again; plugin `Tabs is Panel` and `Badge is Labelled` use them from another module. | super_missing, literal_base_field, literal_missing_field, super_wrong_type, private_field_other_module, private_literal_other_module |
+| F3 | See the next section. | take_super_moved, take_super_after, take_super_nested, take_super_expr (+ take_super_ok, clean) |
+| S3 | See "Built-ins". | value_parent, enum_parent, map_parent, list_override_sig |
+| S5 | `resolve.py ... --exact` and the table below. | (no bad file) |
+| S7 | Override = same receiver mode, parameter names, parameter types, parameter modes, return type, `fails`, `pub`; it may not restate a default. `super.m()` only inside `override fn m` (same name). `show/copy/equals/hash` can't be written, only declared with `is`; an `is equals` base makes every subclass field need `equals`. | override_return, override_ptype, override_fails, override_pub, override_pub_widen, override_receiver, override_default, super_other_name, super_outside_override, cap_override, cap_field |
+| S2 | `--api`, `--api-diff`, cycle warning. | cycle (expect-warning) |
+| S4 | `Pool of dyn Widget` in `h1b/types.p3` (`pools()`). | pool_plain |
+
+Rule changes to keep in mind:
+- **Abstract bases and `super:`.** `Labelled` is abstract (it has no `kind`), yet `Button(super: ..)` needs a `Labelled` value.
+  I allow an abstract type's literal inside its own static functions only, which makes `Labelled.new` a base-part builder
+  (it returns a `Labelled` that can only be handed to `super:`). This is my addition; it is the smallest rule that works,
+  not a review item.
+- **`super:` forbidden when the parent chain has no fields** (`Circle is Shape` is `Circle(r: r)`), required otherwise. A built-in parent (`List`) is never named: `LoggedNames()`.
+- **`pub` now matters for overrides**, so `h1b/types.p3` writes `pub` on every API method (the old H1 file omitted it). Calling a
+  non-`pub` method from outside is not checked yet.
+
+## F3: `take self` and drops (`cmodel/h1b.c`)
+Each class descriptor has `parent`, `drop_own` (the fields that class declares) and a `tail_drop(obj, dyn, from)` function that
+runs the `drop_own` of the dynamic class and its ancestors up to, not including, `from`, **subclass first**.
+- `take self` method of class `X`: do its work, then `tail_drop(obj, dyn, X)` (everything below `X`), then drop `X`'s own fields
+  that were not moved out. The compiler knows `X`'s moved fields statically (drop flags), so a method that returns `self.label`
+  (`into_label`) skips the label and still drops the tail: no double free.
+- Plain drop of a `dyn` is `tail_drop(obj, dyn, NULL)`: whole chain, subclass first.
+- `take self` override that calls `super.close()`: checker rules: the call is a whole statement (`super.m(..)`, `return super.m(..)`
+  or `let x = super.m(..)`) at the top level of the method body, with no `self` in the arguments; no earlier statement moves a
+  non-`Int/Float/Bool` field out (`let i = self.icon`, `x = self.icon`); no later statement mentions `self`. `Badge.close` prints
+  and then returns `super.close()`; `Labelled.close` drops `Badge.icon`, then `Labelled.label`. `Tag` inherits `close` and
+  its `icon` is still dropped (transcript lines 10-13 of `cmodel/h1b.txt`).
+- **Contradiction in the brief:** it said "drop my unmoved fields, then the tail" and also "subclass fields first". I followed the
+  review's order (subclass fields first), so a `take self` method runs the tail before its own fields.
+- ASan + LSan + UBSan on Linux (clang 19): no leaks, no double frees, stderr empty; `run.sh` repeats this and checks the stdout.
+  LSan was confirmed live with a deliberate-leak test program.
+- Not checked: the checker's move detection is syntactic (a `let`/assignment whose value is exactly `self.f`); moves through a
+  call argument are not seen.
+
+## Built-ins (S3)
+- **Classes (may be a parent):** the containers (`List`, `Map`, `SortedMap`, `Lru`, `Pool`) and `Str`. Only `List` has a defined primitive
+  set so far; subclassing the others is an error ("primitive set is not defined yet") until each gets one.
+- **Values, not classes:** `Int`, `Float`, `Bool`, user enums, `Optional`, tuples, `Handle`. `type X is Int` is an error.
+- **`List` primitives:** `push(x)`, `insert(at, x)`, `remove_at(at) -> T`, `get(at) -> Optional of T` (also behind `get_mut`), `set(at, value)`, `len()`.
+  Every other method (`push_all`, `pop`, `retain`, `is_empty`, `take_out`, `map`, `join`, ...) is *derived*: for an exact `List` it
+  takes the direct path; for an instance of a subclass it calls the primitives through the object's vtable. A subclass may also
+  override a derived method (`LoggedAll.push_all` does in H1; H1b no longer needs it).
+- **Syntax:** `xs[i]` is `get`, `xs[i] = v` is `set`, `for x in xs` is `len` once and `get(i)` for each `i`, a list pattern
+  `[a, ..rest]` is `len` plus `get`, `xs += ys` is `push_all`. So a subclass that overrides `get` changes indexing, loops and patterns,
+  and one that overrides `push` changes `+=` and `push_all`.
+- **C model transcript:** `a.push_all([b, c])` on `LoggedNames` now prints `log push b`, `log push c`. An exact `List.push_all` makes
+  0 primitive-slot calls, a `LoggedNames` makes 2. `SortedNames` overrides `push` and `insert`:
+  `push_all([pear, apple, fig])` gives `[apple fig pear]`, `insert(at: 0, zebra)` gives `[apple fig pear zebra]`, `retain` and `pop`
+  keep it sorted.
+
+## S5, S1 numbers (`resolve.py --all .`; `expected/table.txt`)
+| | class calls | dynamic-down | (dyn recv) | (self-call) | static self-calls |
+|---|---|---|---|---|---|
+| H1 (old corpus) | 44 | 23 (52%) | 12 | 11 | 0 |
+| H1b | 58 | 30 (52%) | 16 | 14 | 0 |
+| H1b `--exact` | 58 | 25 (43%) | 16 | 9 | 5 |
+| T3+ iface/impl (old accepted design) | 25 | 10 (40%) | 7 | 3 | 1 |
+
+- `--exact`: a self-call site stays dynamic only if its method body can be reached with a `dyn` receiver (through a `dyn` call,
+  or through open self-calls and `super` calls from such a body). Only 5 of 14 self-call sites became static (`Saveable.describe`,
+  `SortedNames.insert`, `SortedNames.push`). The big ones (`Shape.describe`, `Labelled.render/close`, `Button.event`) are reached
+  through `dyn Shape`/`dyn Widget`, so they stay dynamic. Exact receivers help classes that are not used through `dyn`; they do not
+  change the picture for the base classes that exist to be used through `dyn`.
+- **Does not match the review:** the review says 8 of 25 for T3+; this resolver gets 10 of 25: 7 `dyn` receivers plus the 3 self-calls
+  inside the provided `Shape.describe` and `Shape.intersects` (the only open self-calls in that design). H1's 63% in the review is for a
+  portion of the corpus I did not reproduce; over whole corpora the gap is 40% against 52% (43% with `--exact`).
+- `H1b`'s 16 `dyn` receivers (H1: 12) come from the added `show_widget`, `any_widget` and `pools()`. Their candidate counts are
+  5 or 6 bodies per `dyn Widget` call, as before.
+- Static self-sites in `--exact` rows count as one candidate, so the "avg cand dyn" column rises (3.00 to 3.40) only because the cheap
+  sites left it.
+
+## S2: fragile base tooling
+`resolve.py --api FILE` lists each `pub` method with the `self.` calls its body makes (open ones; `copy` shows as derived).
+`--api-diff OLD NEW` flags every changed self-call set, added method and removed method as BREAKING (exit 1). For `api_v1.p3` ->
+`api_v2.p3` (the review's `Labelled.close` change plus an added `title`):
+
+    BREAKING: Labelled.close self-call set changed: -{text} +{}: a subclass that overrides text no longer sees this method call it
+    BREAKING: Labelled.title added: a subclass that already declares `title` now fails to compile (`override` missing)
+
+A cycle through overrides (a base `push_all` calls `self.push`; a subclass `push` calls `self.push_all`) is a warning
+(`bad/h1b_cycle.p3`). The diff works on the method list of each file; it says nothing about which subclass is hurt (that needs
+the whole program).
+
+## S4: pools
+`Pool of Button` holds exactly `Button` (`add(value: badge)` is rejected: "write `Pool of dyn Button`"); `with b = buttons[h]` gives
+a plain `Button` and static calls. `Pool of dyn Widget` holds a `Button`, a `Slider` and a `Badge`; `with w = widgets[h]` gives a `dyn Widget`
+and dynamic calls. Likewise a `LoggedNames` can't be passed as a plain `List of Str` (`h1b_plain_list_param`); a `pub` function that
+wants to accept subclasses must say `dyn`. The lint for class-typed `pub` parameters is not written.
+
+## S6: two roles
+Unchanged: `SaveableButton` is a `Widget` with a `Button` field plus three forwarding methods and a snapshot `as_saveable()`.
+If John answers yes to issue #6 (extra parents that are abstract only: no fields, no bodies), it would read:
+
+    type Saveable { pub fn save(self) -> Str }                          # abstract only: no fields, no bodies, no provided methods
+    type SaveableButton is Button, Saveable {                           # one stateful chain (Button), plus abstract parents
+      pub override fn save(self) -> Str { return "button:{self.title()}" }
+    }
+
+`Saveable.describe` (a provided function) would have to go, or move out as `fn describe(s: dyn Saveable)`; every body still sits
+on the `Button` chain, the object has one vtable per abstract parent (as in `cmodel/h2.c`), and a `dyn Saveable` of a `SaveableButton`
+is one object, so the "live view" problem disappears. Not implemented in the checker.
+
+## Still awkward
+- A literal is checked by class name only: generic arguments (`List of dyn Widget` against `List of Button`) are not compared,
+  except for list-literal elements. Casts, `match` on `dyn` and downcasts are not modelled at all.
+- Abstract-base construction (above) is an invented rule; a reader meets `Labelled.new` returning an abstract type.
+- `dyn` values can't expose fields, so any data a subclass needs from a base must go through a method (`title()`).
+- Six primitives mean overriding `get` changes the cost of every loop; there is no way to say "I only want `push`".
+- Fragile base risk remains by design; the tooling reports it but cannot prevent it.
+- Windows and macOS have not been run by the author of these files (the sanitizer step is Linux only).

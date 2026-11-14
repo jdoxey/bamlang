@@ -1,0 +1,5 @@
+# expect: write `dyn Base`
+type Base { pub n: Int }
+type Sub is Base { pub extra: Int }
+fn takes(b: Base) -> Int { return 1 }
+fn main(d: dyn Base) { takes(b: d) }

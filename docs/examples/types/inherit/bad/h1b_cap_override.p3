@@ -1,0 +1,3 @@
+# expect: derived per exact class
+type Base is show { pub n: Int }
+type Sub is Base { pub fn show(self) -> Str { return "mine" } }

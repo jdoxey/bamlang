@@ -1,0 +1,6 @@
+# expect: write `dyn Base`
+type Base {
+  pub n: Int
+  pub fn go(self) -> Int { return helper(l: self) }
+}
+fn helper(l: Base) -> Int { return 1 }

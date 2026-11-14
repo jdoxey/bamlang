@@ -1,0 +1,9 @@
+# expect: is private to module `core` and its subclasses
+module core {
+  type Base { n: Int
+    pub fn new(n: Int) -> Base { return Base(n: n) } }
+}
+fn main() {
+  let b = Base.new(n: 1)
+  print(text: "{b.n}")
+}

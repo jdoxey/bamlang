@@ -1,0 +1,2 @@
+# expect: primitive set is not defined yet
+type Cache is Map of Str to Int { }

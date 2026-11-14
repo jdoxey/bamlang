@@ -1,0 +1,24 @@
+# S2 demo, version 2: the library author "only" tidied close() so it reads the label directly, and added title().
+# Both compile for every subclass; the diff tool says what changed for them.
+module core {
+  type Widget {
+    pub fn close(take self) -> Str
+  }
+  type Labelled is Widget {
+    label: Str
+    pub fn new(label: Str) -> Labelled { return Labelled(label: label) }
+    pub fn kind(self) -> Str
+    pub fn text(self) -> Str { return self.label }
+    pub fn title(self) -> Str { return self.label }
+    pub override fn close(take self) -> Str { return "{self.kind()} {self.label}" }
+  }
+}
+module plugin {
+  use core.Labelled
+  type Badge is Labelled {
+    count: Int
+    pub fn new(label: Str, count: Int) -> Badge { return Badge(super: Labelled.new(label: label), count: count) }
+    pub override fn kind(self) -> Str { return "Badge" }
+    pub override fn text(self) -> Str { return "{self.label} x{self.count}" }
+  }
+}

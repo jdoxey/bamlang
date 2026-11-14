@@ -1,0 +1,2 @@
+# expect: `Int` is a value type, not a class
+type Meters is Int { }

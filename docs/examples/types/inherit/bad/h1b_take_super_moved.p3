@@ -1,0 +1,11 @@
+# expect: was moved out before the call
+type Base {
+  pub fn close(take self) -> Str { return "base" }
+}
+type Sub is Base {
+  icon: Str
+  pub override fn close(take self) -> Str {
+    let i = self.icon
+    return super.close()
+  }
+}

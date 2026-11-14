@@ -1,0 +1,5 @@
+# expect: has no `equals`
+type Plain { pub n: Int }
+type Base is equals { pub n: Int }
+type Sub is Base { pub extra: Plain
+  pub fn new(extra: Plain) -> Sub { return Sub(super: Base(n: 1), extra: extra) } }

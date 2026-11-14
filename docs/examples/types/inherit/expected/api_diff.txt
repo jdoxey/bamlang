@@ -1,0 +1,2 @@
+BREAKING: Labelled.close self-call set changed: -{text} +{}: a subclass that overrides text no longer sees this method call it
+BREAKING: Labelled.title added: a subclass that already declares `title` now fails to compile (`override` missing)

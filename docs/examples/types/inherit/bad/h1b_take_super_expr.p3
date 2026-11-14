@@ -1,0 +1,8 @@
+# expect: must be a whole statement
+type Base {
+  pub fn close(take self) -> Str { return "base" }
+}
+type Sub is Base {
+  flag: Str
+  pub override fn close(take self) -> Str { return "{self.flag} {super.close()}" }
+}

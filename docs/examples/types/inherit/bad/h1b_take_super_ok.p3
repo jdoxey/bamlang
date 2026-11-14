@@ -1,0 +1,13 @@
+# expect-clean: `super.close()` as the whole last statement is fine; reading Int fields before it is fine
+type Base {
+  pub fn close(take self) -> Str { return "base" }
+}
+type Sub is Base {
+  icon: Str
+  count: Int
+  pub override fn close(take self) -> Str {
+    let c = self.count
+    print(text: "closing {c} {self.icon}")
+    return super.close()
+  }
+}

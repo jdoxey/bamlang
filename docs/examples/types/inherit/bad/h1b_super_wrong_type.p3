@@ -1,0 +1,10 @@
+# expect: write `dyn Base`
+type Base { n: Int
+  pub fn new(n: Int) -> Base { return Base(n: n) } }
+type Sub is Base { pub extra: Int }
+type Sub2 is Sub { pub more: Int }
+fn main() {
+  let s = Sub(super: Base.new(n: 1), extra: 1)
+  let t = Sub2(super: s, more: 1)
+  let u = Sub(super: t, extra: 2)
+}
