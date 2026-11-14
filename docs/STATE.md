@@ -2,18 +2,13 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D11, testing, coverage and debugger tooling (Light).
-- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes), 0009 dependencies (git paths, MVS, hashed, no build scripts), 0010 stdlib v1 scope; ADR-0005 amended for inheritance (your issues #5, #6). Veto by opening an issue.
+- **Now:** D12, the language name and file extension (Light): I propose 5 and pick one; you can veto.
+- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes), 0009 dependencies (git paths, MVS, hashed, no build scripts), 0010 stdlib v1 scope, 0011 test/cover/debug tools; ADR-0005 amended for inheritance (your issues #5, #6). Veto by opening an issue.
 - **Needs you (optional yes/no):** may CI download a SHA-pinned llvm-mingw (182 MB) to test replacing the 6–7 GB VS Build Tools on Windows? I recommend yes.
 
 ## Next action
 
-**D11** (ADR-0011, Light): testing, coverage and debugger tooling (G8–G10). Inputs:
-- ADR-0007: test suites as data (`Group`, `Case`, `body: fn() fails`), the runner names the path; discovery without annotations.
-- ADR-0004: `expect_trap`; traps caught only there and at `try crew`.
-- ADR-0008: coverage via llvm-cov remapped to `.p3`; gdb/lldb/cdb sessions; formatters.
-- ADR-0009: commands `new/build/run/test`.
-Then D12 (name, Light), then M0.
+**D12** (ADR-0012, Light): propose 5 names and a file extension; check each against existing languages, tools and trademarks (a quick web search), and against typing and saying it; pick one. John can veto by issue. Then rename `p3c`/`.p3` in PLAN.md (the corpus keeps `.p3` until M0 copies it), and start **M0**.
 
 ## Open questions carried forward
 
@@ -32,6 +27,8 @@ Then D12 (name, Light), then M0.
 - **D9 toolchain spike (T2 llvm-mingw, T3 zig cc on Windows):** the session's permission check denied an agent that would download and run third-party toolchain binaries in CI. Not retried. T1 (system clang, already green on all three OSes in ADR-0008's CI) is the v1 default until John allows the downloads; see ADR-0009.
 
 ## Log
+
+- 2026-11-14: D11 done (ADR-0011, Light).
 
 - 2026-11-14: D10 done (ADR-0010, Light).
 
