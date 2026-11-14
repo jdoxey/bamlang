@@ -1,0 +1,2 @@
+# expect: 2: expected ')' after the parameters
+fn f(x: dyn 5) { }

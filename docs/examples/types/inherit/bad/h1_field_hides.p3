@@ -1,0 +1,3 @@
+# expect: hides the field
+type A { x: Int }
+type B is A { x: Int }

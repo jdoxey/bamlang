@@ -1,0 +1,2 @@
+# expect: 2: `hook` appears twice
+type A { hook hook fn a(self) -> Int { return 1 } }

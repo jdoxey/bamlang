@@ -1,0 +1,6 @@
+# expect: is ambiguous
+type Widget { fn describe(self) -> Str { return "widget" } }
+type Saveable { fn describe(self) -> Str { return "saveable" } }
+type Button is Widget, Saveable {
+  override fn describe(self) -> Str { return super.describe() }
+}

@@ -1,0 +1,5 @@
+# expect: has one parent
+type A { fn a(self) -> Int { return 1 } }
+type C is A {
+  override fn a(self) -> Int { return super(A).a() }
+}

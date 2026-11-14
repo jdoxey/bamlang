@@ -1,0 +1,298 @@
+# types under H2: one parent with fields plus any number of field-less parents (`type Button is Widget, Saveable`).
+# A method inherited from two parents must be overridden, and may call super(Parent).m(). self.m() inside a class is
+# static unless m is abstract or `hook fn`. A built-in never calls its own overridable methods.
+
+module core {
+  # B1. Shape: a set OTHERS extend -> abstract base + dyn Shape
+  type Shape is show {
+    fn area(self) -> Float
+    fn name(self) -> Str
+    fn describe(self) -> Str {
+      return "{self.name()} {self.area():.2}"          # self-calls to abstract methods are dynamic
+    }
+    fn intersects(self, other: dyn Shape) -> Bool {
+      return self.area().sqrt() + other.area().sqrt() > 5.0
+    }
+  }
+
+  type Circle is Shape {
+    r: Float
+
+    pub fn new(r: Float) -> Circle fails {
+      if r <= 0.0 { fail "bad radius {r}" }
+      return Circle(r)
+    }
+    override fn area(self) -> Float { return PI * self.r * self.r }
+    override fn name(self) -> Str { return "circle" }
+  }
+
+  type Rect is Shape {
+    w: Float
+    h: Float
+
+    pub fn new(w: Float, h: Float) -> Rect fails {
+      if w <= 0.0 or h <= 0.0 { fail "bad size {w}x{h}" }
+      return Rect(w, h)
+    }
+    override fn area(self) -> Float { return self.w * self.h }
+    override fn name(self) -> Str { return "rect" }
+  }
+
+  # B2. Widget: open set of kinds, containers included. No Ext variant, no enum: Panel and Button are subclasses.
+  pub enum Event { Click, Drag(dx: Int), Close }
+  const FOCUS = "focus moves to next"
+
+  type Widget {
+    fn render(self, depth: Int) -> Str
+    fn event(mut self, path: List of Int, ev: Event) -> Str
+    fn close(take self) -> Str
+    fn focus_next(self) -> Str { return FOCUS }
+    fn describe(self) -> Str { return "widget" }
+  }
+
+  # shared routing, public so a plugin container reuses it: Close at the last step takes the child out
+  pub fn route(mut children: List of dyn Widget, path: List of Int, ev: Event) -> Str {
+    match (path, ev) {
+      ([], _) => return "ignored"
+      ([i], Close) if i < children.len() => {
+        let c = children.take_out(at: i)
+        return "consumed {c.close()}; {FOCUS}"
+      }
+      ([i, ..rest], _) => return match children.get_mut(at: i) { some(c) => c.event(path: rest, ev), none => "no such widget" }
+      _ => return "ignored"
+    }
+  }
+
+  type Panel is Widget {
+    pub children: List of dyn Widget
+
+    pub fn new(children: List of dyn Widget) -> Panel { return Panel(children) }
+    override fn render(self, depth: Int) -> Str {
+      var out = "{indent(levels: depth)}Panel\n"
+      for c in self.children { out += c.render(depth: depth + 1) }
+      return out
+    }
+    override fn event(mut self, path: List of Int, ev: Event) -> Str { return route(children: self.children, path, ev) }
+    override fn close(take self) -> Str { return "Panel[{self.children.map(each: fn(c) { c.close() }).join(sep: ", ")}]" }
+  }
+
+  # (c) template method: Labelled.render and Labelled.close call the overridable steps kind() and text()
+  type Labelled is Widget {
+    pub label: Str
+
+    fn kind(self) -> Str                                   # abstract: self-calls are dynamic without `hook`
+    hook fn text(self) -> Str { return self.label }       # extension point: self.text() below stays dynamic
+    override fn render(self, depth: Int) -> Str { return "{indent(levels: depth)}{self.kind()} {self.text()}\n" }
+    override fn close(take self) -> Str { return "{self.kind()} {self.text()}" }
+  }
+
+  type Button is Labelled {
+    pub fn new(label: Str) -> Button fails {
+      if label == "" { fail "empty label" }
+      return Button(label)
+    }
+    override fn kind(self) -> Str { return "Button" }
+    override fn event(mut self, path: List of Int, ev: Event) -> Str {
+      match ev {
+        Click => return "pressed {self.label}; {self.focus_next()}"
+        _ => return "ignored"
+      }
+    }
+  }
+
+  # B3. Money and Account: no hierarchy
+  type Money {
+    cents: Int
+
+    pub fn new(cents: Int) -> Money fails {
+      if cents < 0 { fail "negative money {cents}" }
+      return Money(cents)
+    }
+    pub fn cents(self) -> Int { return self.cents }
+    pub fn plus(self, o: Money) -> Money { return Money(cents: self.cents + o.cents) }
+    pub fn minus(self, o: Money) -> Optional of Money {
+      if o.cents > self.cents { return none }
+      return some(value: Money(cents: self.cents - o.cents))
+    }
+  }
+
+  type Account {
+    owner: Str
+    balance: Money
+
+    pub fn new(owner: Str, balance: Money) -> Account fails {
+      if owner == "" { fail "empty owner" }
+      return Account(owner, balance)
+    }
+    pub fn deposit(mut self, m: Money) { self.balance = self.balance.plus(o: m) }
+    pub fn withdraw(mut self, m: Money) fails {
+      match self.balance.minus(o: m) {
+        some(b) => { self.balance = b }
+        none    => fail "insufficient funds: balance {self.balance.cents()}, need {m.cents()}"
+      }
+    }
+  }
+
+  pub fn transfer(mut pool: Pool of Account, a: Handle of Account, b: Handle of Account, m: Money) fails {
+    with src = pool[a] { try src.withdraw(m) }
+    with dst = pool[b] { dst.deposit(m) }
+  }
+
+  # (a) the two-roles case, first half: a serialisable role as an abstract base
+  type Saveable {
+    fn save(self) -> Str
+    fn describe(self) -> Str { return "saveable {self.save()}" }
+  }
+}
+
+module plugin {
+  use core.Shape
+  use core.Widget
+  use core.Panel
+  use core.Button
+  use core.Saveable
+
+  type Hexagon is Shape {
+    side: Float
+
+    pub fn new(side: Float) -> Hexagon fails {
+      if side <= 0.0 { fail "bad side {side}" }
+      return Hexagon(side)
+    }
+    override fn area(self) -> Float { return 3.0 * 3.0.sqrt() / 2.0 * self.side * self.side }
+    override fn name(self) -> Str { return "hexagon" }
+    fn grow(mut self, k: Float) { self.side = self.side * k }
+  }
+
+  type SliderSpec { pub value: Int, pub max: Int = 10 }
+
+  type Slider is Widget {
+    value: Int
+    max: Int
+
+    pub fn new(s: SliderSpec) -> Slider fails {
+      if s.value < 0 or s.value > s.max { fail "slider out of range" }
+      return Slider(value: s.value, max: s.max)
+    }
+    override fn render(self, depth: Int) -> Str { return "{indent(levels: depth)}Slider {self.value}/{self.max}\n" }
+    override fn event(mut self, path: List of Int, ev: Event) -> Str {
+      match ev {
+        Drag(d) => {
+          let old = self.value
+          self.value = clamp(value: old + d, low: 0, high: self.max)
+          return "value {old} -> {self.value}; {self.focus_next()}"
+        }
+        _ => return "ignored"
+      }
+    }
+    override fn close(take self) -> Str { return "Slider {self.value}/{self.max}" }
+  }
+
+  # a plugin container: a subclass of core's Panel; event is inherited, only render and close change
+  type Tabs is Panel {
+    pub fn new(children: List of dyn Widget) -> Tabs fails {
+      if children.is_empty() { fail "empty tabs" }
+      return Tabs(children)
+    }
+    override fn render(self, depth: Int) -> Str {
+      var out = "{indent(levels: depth)}Tabs\n"
+      for c in self.children { out += c.render(depth: depth + 1) }
+      return out
+    }
+    override fn close(take self) -> Str { return "Tabs[{self.children.map(each: fn(c) { c.close() }).join(sep: ", ")}]" }
+  }
+
+  # (c) a second Labelled kind that overrides the default step text()
+  type Badge is Labelled {
+    count: Int
+
+    pub fn new(label: Str, count: Int) -> Badge { return Badge(label, count) }
+    override fn kind(self) -> Str { return "Badge" }
+    override fn text(self) -> Str { return "{self.label} x{self.count}" }
+    override fn event(mut self, path: List of Int, ev: Event) -> Str { return "ignored" }
+  }
+
+  # (a) a widget that is also serialisable. H2: Saveable is a stateless second parent; both roles are one object.
+  # describe() is inherited from Widget (via Button) and from Saveable: the class must override it.
+  type SaveableButton is Button, Saveable {
+    pub fn new(label: Str) -> SaveableButton fails {
+      if label == "" { fail "empty label" }
+      return SaveableButton(label)
+    }
+    override fn save(self) -> Str { return "button:{self.label}" }
+    override fn describe(self) -> Str { return "{super(Saveable).describe()} / {super(Button).describe()}" }
+  }
+
+  # (b) subclassing a built-in. push is overridden to log.
+  type LoggedNames is List of Str {
+    override fn push(mut self, x: Str) {
+      print(text: "log push {x}")
+      super.push(x)
+    }
+  }
+
+  # a user-written push_all that loops over self.push, and a further subclass that counts pushes
+  type LoggedAll is LoggedNames {
+    override fn push_all(mut self, xs: List of Str) {
+      for x in xs { self.push(x) }
+    }
+  }
+  type CountedNames is LoggedAll {
+    n: Int = 0
+    override fn push(mut self, x: Str) {
+      self.n += 1
+      super.push(x)
+    }
+  }
+}
+
+fn save_all(items: List of dyn Saveable) -> Str {
+  var out = ""
+  for s in items { out += "{s.save()};" }
+  return out
+}
+
+fn fill(mut names: dyn List of Str, more: List of Str) { names.push_all(xs: more) }
+
+fn b1() fails {
+  let c1 = try Circle.new(r: 1.0)
+  let h1 = try Hexagon.new(side: 2.0)
+  let r1 = try Rect.new(w: 2.0, h: 3.0)
+  let shapes: List of dyn Shape = [c1, h1, r1]
+  var total = 0.0
+  for s in shapes { print(text: s.describe()); total += s.area() }
+  print(text: "total {total:.2}")
+  eprint(text: "{shapes[0].intersects(other: shapes[1])} {shapes[1].show()}")
+}
+
+fn b2() fails {
+  let cancel = try Button.new(label: "Cancel")
+  let ok = try Button.new(label: "OK")
+  let slider = try Slider.new(s: SliderSpec(value: 3))
+  let inner = Panel.new(children: [cancel])
+  let kids: List of dyn Widget = [ok, slider, inner]
+  var root = Panel.new(children: kids)
+  print(text: "build"); print(text: root.render(depth: 0))
+  print(text: root.event(path: [0], ev: Click))
+  let x = try Button.new(label: "X")
+  let sb = try SaveableButton.new(label: "Save")
+  print(text: sb.describe())
+  let saved: List of dyn Saveable = [sb]
+  print(text: save_all(items: saved))
+  let sb2 = try SaveableButton.new(label: "Again")
+  let tabs = try Tabs.new(children: [x, sb2])
+  print(text: tabs.render(depth: 0))
+  let badge = Badge.new(label: "inbox", count: 3)
+  print(text: badge.render(depth: 0))
+}
+
+fn b4() {
+  var a = LoggedNames()
+  a.push(x: "a")
+  a.push_all(xs: ["b", "c"])
+  var c = CountedNames()
+  c.push_all(xs: ["x", "y"])
+  c.push(x: "z")
+  fill(names: c, more: ["w"])
+  print(text: "n = {c.n}")
+}

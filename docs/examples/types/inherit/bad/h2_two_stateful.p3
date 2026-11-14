@@ -1,0 +1,4 @@
+# expect: only one parent may have fields
+type A { x: Int }
+type B { y: Int }
+type C is A, B { z: Int }

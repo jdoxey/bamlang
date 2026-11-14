@@ -1,0 +1,2 @@
+# expect: 2: a method can't be both
+type A { override hook fn a(self) -> Int { return 1 } }

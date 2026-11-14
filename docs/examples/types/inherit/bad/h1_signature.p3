@@ -1,0 +1,8 @@
+# expect: changes the signature
+type Shape {
+  fn area(self) -> Float
+  fn name(self) -> Str { return "shape" }
+}
+type Circle is Shape {
+  override fn area(self, scale: Float) -> Float { return scale }
+}

@@ -1,0 +1,10 @@
+# expect: would hide it
+type Shape {
+  fn area(self) -> Float
+  fn name(self) -> Str { return "shape" }
+}
+type Circle is Shape {
+  r: Float
+  override fn area(self) -> Float { return self.r }
+  fn name(self) -> Str { return "circle" }
+}

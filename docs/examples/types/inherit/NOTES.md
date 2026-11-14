@@ -1,0 +1,150 @@
+# Inheritance finalists H1, H2, H3: step 3 examples (ADR-0005 amendment 1, issue #5)
+
+Run `bash run.sh` (Linux, macOS, Git Bash on Windows with clang). It parses the three corpora, runs the checker bad files,
+runs the 3 am resolver and compares its table with `expected/table.txt`, builds and runs the C models and compares
+transcripts. Last local result (Linux, clang 19, Python 3): `inherit examples OK`. Windows and macOS have not been run by the
+author of these files; the script strips CR, adds `.exe`, and defines `_CRT_SECURE_NO_WARNINGS`.
+
+| File | What |
+|---|---|
+| `parser.py` | copy of `../../syntax/p3n/parser.py` with the inheritance grammar (below) |
+| `h1/types.p3`, `h2/types.p3`, `h3/types.p3` | the benchmark (shapes, widgets, `Slider`, container `Tabs`, accounts) plus (a) `SaveableButton`, (b) `LoggedNames`, (c) template method `Labelled` |
+| `resolve.py` | per-finalist checker plus the 3 am resolver (`--rules h1\|h2\|h3 FILE [--detail]`, `--all DIR`) |
+| `bad/` | 36 bad files: `parse_*` (parser), `h1_*`, `h2_*`, `h3_*` (checker; `# expect:` error, `# expect-warning:`, `# expect-clean:`) |
+| `cmodel/h1.c h2.c h3.c` + `.txt` | C11 dispatch models and their expected transcripts |
+
+## Grammar additions (`parser.py`)
+- `type Name [is X, Y, ...] { ... }`. An item starting lowercase is a built-in capability, `(is show)`; an item starting
+  uppercase is a parent type, `(extends (t Widget) (t Saveable))`; the parent may be `List of Str`. The parser accepts any
+  number of parents; the checker enforces one (H1, H3) or one stateful plus stateless ones (H2).
+- Members of a `type`: `[pub] [override|hook] fn name(...) ...`. `(fn name [pub] [override] [hook] [abstract] [fails] ...)`.
+  `override` and `hook` are contextual words (a field may still be called `hook`). Both on one method is a parse error.
+- A `fn` inside a `type` with no body gets the flag `abstract` (no block child). Top-level `fn` without a body is unchanged.
+- `super.m(args)` -> `(supercall m args...)`; `super(Parent).m(args)` -> `(supercall m (via Parent) args...)`. `super` is now a
+  reserved word (29 reserved words).
+- `dyn` takes a full type: `dyn Shape` -> `(dyn Shape)` (as before), `dyn List of Str` -> `(dyn List (t Str))`.
+- `iface` and `impl` are errors ("is removed"). `pub iface` fails in `pub`'s check.
+- No other AST change: `chatsim`, `widgets`, `errors`, `tricky` give byte-identical ASTs to `../../syntax/p3n/expected/`; the
+  old `types.p3` is now rejected at its first `iface`.
+- Also: `fn` and `type` nodes carry a `.line` attribute (not printed) for the checker's messages.
+
+## Corpus sizes (lines, including comments and blanks)
+| | total | `module core` | `module plugin` (what the plugin author writes) | main fns |
+|---|---|---|---|---|
+| H1 | 302 | 143 | 105 | 54 |
+| H2 | 298 | 143 | 99 | 56 |
+| H3 | 303 | 143 | 105 | 55 |
+
+The old iface version (`../../syntax/p3n/corpus/types.p3`) is 236 lines without the three additions, which add about 60
+lines to each corpus. `Tabs` shrank to 11 lines (it is `is Panel`, so `event` is inherited), while the closed `Widget`
+enum with its `Ext` variant and the `match self` dispatchers are gone.
+
+## The 3 am resolver (`resolve.py --all .`)
+Every method call in each corpus, from the parsed AST, with a small table for List's methods. `static-up`: walk up from
+the receiver's static type (steps = classes walked; 1 means it is on the class itself). `dynamic-down`: a `dyn Base`
+receiver, or a self-call that is open (H1) or goes to an abstract or `hook` method (H2/H3): every body in Base and its
+concrete subclasses can run. Excluded from "class calls": `Type.new` calls, calls on Str/Int/plain List, derived `show`.
+
+| finalist | class calls | static-up | (super) | (closed self) | dynamic-down | (dyn receiver) | (self-call) | avg cands | avg cands, dynamic only | max cands | max up-steps | type-calls | excluded | warnings |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| H1 | 44 | 21 | 2 | 0 | 23 | 12 | 11 | 1.91 | 2.74 | 5 | 3 | 13 | 12 | 0 |
+| H2 | 42 | 22 | 4 | 3 | 20 | 12 | 8 | 1.79 | 2.65 | 4 | 3 | 13 | 12 | 1 |
+| H3 | 44 | 24 | 2 | 3 | 20 | 12 | 8 | 1.89 | 2.95 | 5 | 3 | 13 | 12 | 1 |
+
+Reading it:
+- About 27% to 29% of class calls are `dyn` receivers (12 sites in every corpus). That part is the same for all three.
+- The finalists differ only on **self-calls**. H1 makes all 11 of them dynamic (including `Button.event -> self.focus_next()`,
+  which has exactly one body in the whole program, yet a reader cannot know that without searching downward). H2/H3 make 3
+  of those 11 static; the 8 that stay dynamic are calls to abstract methods or to `hook text`.
+- Max up-steps is 3 for all (`Button.event` -> `self.focus_next()` found in `Widget`, three classes up).
+- Max candidates is 5 for H1/H3 (`dyn Widget.render` or `.close`: Panel, Labelled, Slider, Tabs, SaveableButton) and 4 for H2,
+  because H2's `SaveableButton` inherits `Button`'s `render` instead of forwarding it. The forwarding methods of H1/H3
+  (3 methods) add 3 candidate bodies to every `dyn Widget` render/close/event call.
+- The checker warns once in H2/H3: `CountedNames.push` is bypassed by `LoggedAll.push_all` (see below).
+  `--detail` lists every site.
+
+## LoggedNames: the exact transcripts (from `cmodel/*.txt`)
+Program: `a = LoggedNames` (overrides `push`: logs, then `super.push`); `LoggedAll is LoggedNames` (overrides `push_all` as a
+loop over `self.push`); `CountedNames is LoggedAll` (overrides `push`: counts `n`, then `super.push`).
+
+| step | H1 (open self-call) | H2 and H3 (closed self-call, `push` is not a hook) |
+|---|---|---|
+| `a.push("a")` | `log push a` | `log push a` |
+| `a.push_all(["b","c"])` | no output: `List.push_all` does not call `push`; `a = [a b c]` | the same |
+| `c.push_all(["x","y"])`, `c: CountedNames` | `log push x`, `log push y`; **`c.n = 2`** | `log push x`, `log push y`; **`c.n = 0`** |
+| `c.push("z")` | `log push z`; `c.n = 3` | `log push z`; `c.n = 1` |
+| `fill(c, ["w"])` (a `dyn List of Str`) | `log push w`; `c.n = 4` | `log push w`; `c.n = 1` |
+| final list | `[x y z w]` | `[x y z w]` |
+
+The two rules differ in exactly one place. Under H1, `LoggedAll.push_all` reaches `CountedNames.push` through the object's
+vtable, so the counter is right. Under H2/H3 the call goes to `LoggedNames.push`, the counter misses 3 of 4 pushes, and the log
+is still complete. The author of `CountedNames` gets no error, only the checker's warning; the cure is for `LoggedAll` to
+declare a `hook fn` of its own that `push_all` calls (not possible for `List.push`, which is not ours). Under H1 the opposite
+risk is the classic one: if `LoggedAll.push_all` later stops calling `self.push`, or a subclass overrides `push` and calls
+`self.push_all`, the loop recurses; nothing in the source of `LoggedAll` shows that.
+
+The built-in `List.push_all` never calls `push` under any finalist (`a.push_all` in the table), so a `LoggedNames` that only
+overrides `push` silently logs fewer pushes than a reader expects. A logging subclass has to override `push_all` too. Both
+rules need the List documentation to state its primitive set.
+
+## What was awkward
+1. **Two roles, H1/H3.** `SaveableButton` can be in a `List of dyn Widget` or in a `List of dyn Saveable`, not both from one
+   object. I made it a `Widget` with a `Button` field and three forwarding methods (`render`, `event`, `close`) and a
+   `as_saveable()` that returns a *snapshot* `ButtonSaver` (an owned copy). That is not the same thing: a later label change is
+   not reflected, and `SaveableButton` is not itself `Saveable`. Returning a live borrowed `dyn Saveable` view of a field is not
+   expressible under ADR-0001 without a new rule. Forwarding is also a silent trap: a new abstract method added to `Widget`
+   is flagged (the class becomes abstract), but a new *defaulted* method is not forwarded, so `self.button.m()` and
+   `sb.m()` can disagree.
+2. **Two roles, H2.** `SaveableButton is Button, Saveable` is 8 lines, one object, two views (`cmodel/h2.c`: same pointer, two
+   vtables). The cost shows up in `describe`: it exists in `Widget` and in `Saveable`, so the class is forced to override
+   it and to pick with `super(Saveable)` and `super(Button)`. The reader of any class with two parents must check every
+   method name against both sets; the checker does it, but a human at 3 am has to look in both chains. `super(Button).describe()`
+   lands three classes up.
+3. **Subclassing List.** The fact that `push_all` does not use `push` is invisible at the use site; see above. Neither rule
+   helps, it is only the "primitive set" documentation. A `List` field on `LoggedNames` is also awkward (the subclass *is* the
+   list), and `n` in `CountedNames` is a field of a built-in subclass, which needs the built-in layout to be extensible (C model:
+   `struct { List l; int n; }`).
+4. **H1's open recursion costs a hidden argument everywhere.** Every method of every class needs the dynamic vtable so
+   `self.m()` can dispatch (`cmodel/h1.c`: the `vt` parameter on all methods). H2/H3 need it only in methods that contain
+   a hook or abstract self-call (the C models still pass it uniformly, for simplicity).
+5. **Abstract methods are implicit hooks.** Under H2/H3 a self-call to a bodyless method must be dynamic, so the rule is
+   "abstract implies `hook`". The alternative (a compile error: "call to an abstract method must be declared hook") adds a
+   word to every template method with no information.
+6. **Forgotten `hook` is silent.** `Badge` overrides `text`; without `hook` on `Labelled.text`, `Labelled.render` would not
+   call it. The checker only warns when it sees a closed self-call plus an override. Worse, `hook` must be added by the
+   *base* author, who cannot know what subclasses want (the Java "design for inheritance" problem, now explicit).
+7. **Panel and the closed `Widget` enum.** `collapse` (a `Panel` turning itself into a `Button` with `self = Button(...)`)
+   has no analogue: a value cannot change class. I dropped it. `Panel.children` had to be `pub` for `Tabs is Panel` to
+   reach it; there is no `protected`, so a field is either public or invisible to subclasses.
+8. **Constructors and statics are not inherited.** `Tabs.new` is a separate function; `Tabs(children)` sets the inherited
+   field by name. The checker exempts static `fn` from `override` (otherwise every `new` would need `override`).
+9. **Hiding vs override.** The checker has one error for both ("already defined in Base: write `override`"). Because `override`
+   is required and hiding is an error, the bad files never needed a "hides" case beyond that.
+10. **Resolver blind spots.** It is syntactic: it follows declared parameter types, `let` types and return types, and it needs a
+    receiver type for every call (it fails on an unresolved one, so nothing is skipped). It knows only `List` as a built-in
+    class; Str, Int and others are treated as final primitives. Candidates for `dyn B` are the bodies of concrete subclasses
+    in the program, so a plugin added later changes the numbers (the point of the "whole-program dyn check").
+
+## Checker rules (resolve.py), by finalist
+- All: unknown parent, cycle, field hiding, missing `override` (also hiding), `override` with no base method, override
+  changing receiver mode or parameter names, `super.m()` with no parent method or an abstract one, constructing a type
+  with abstract methods left, unknown method on a self or `dyn` receiver.
+- H1: `hook` is an error; one parent; `super(P)` is an error.
+- H3: one parent; `super(P)` is an error; warning for an override bypassed by a closed self-call.
+- H2: only one parent may have fields (a built-in such as List counts as having fields); a method reachable by two different
+  bodies from two parents must be overridden (an abstract plus a concrete body also counts); `super.m()` with two parents is
+  ambiguous; `super(P)` must name a direct parent; the same bypass warning.
+
+## C models (`cmodel/`)
+Objects have no vptr: a plain value is exactly its class, calls on it are direct, and slicing cannot happen. A `dyn Base`
+is `{pointer, vtable}`, boxed at the store site. A class vtable has the ancestors' slots first (inherited slots point at the
+ancestor's function). `super.m()` is a direct call. The List built-in uses a private `list_append` so that `push_all` never calls
+the overridable `push`.
+- `h1.c`: every method takes the dynamic vtable; `self.m()` is `vt->m()`.
+- `h3.c`: as H1; closed self-calls are direct calls (`Widget_focus_next(...)`, `LoggedNames_push(...)`); abstract and hook
+  self-calls (`kind`, `text`, `name`, `area`) stay `vt->`.
+- `h2.c`: a class descriptor holds one view vtable per role (`widget`, `saveable`, `shape`, `list`); `SaveableButton` has one
+  object and two views (`sw.p == sv.p`; the stateless parent needs no pointer adjustment). Self-calls to hooks are
+  `dc->widget->kind(...)`; `super(Saveable).describe()` is a direct call.
+- All three also print `QuietButton` (overrides `focus_next`; `Button.click` calls `self.focus_next()`): H1 prints
+  `focus stays`, H2/H3 print `focus moves to next` because `focus_next` is not a hook there.

@@ -1,0 +1,6 @@
+# expect: `override fn describe`
+type Widget { fn describe(self) -> Str { return "widget" } }
+type Saveable { fn describe(self) -> Str { return "saveable" } }
+type Button is Widget, Saveable {
+  fn describe(self) -> Str { return super(Saveable).describe() }
+}

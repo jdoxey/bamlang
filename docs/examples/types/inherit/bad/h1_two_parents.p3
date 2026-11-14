@@ -1,0 +1,4 @@
+# expect: allows one parent
+type A { fn a(self) -> Int { return 1 } }
+type B { fn b(self) -> Int { return 2 } }
+type C is A, B { x: Int }

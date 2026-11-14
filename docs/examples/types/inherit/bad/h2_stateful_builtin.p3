@@ -1,0 +1,3 @@
+# expect: only one parent may have fields
+type A { x: Int }
+type C is A, List of Str { z: Int }

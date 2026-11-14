@@ -1,0 +1,2 @@
+# expect: 2: 'pub' must be followed by
+pub iface Shape { fn area(self) -> Float }

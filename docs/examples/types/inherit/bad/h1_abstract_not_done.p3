@@ -1,0 +1,10 @@
+# expect: cannot build `Circle`
+type Shape {
+  fn area(self) -> Float
+  fn name(self) -> Str { return "shape" }
+}
+type Circle is Shape {
+  r: Float
+  override fn name(self) -> Str { return "circle" }
+}
+fn make() -> Circle { return Circle(r: 1.0) }

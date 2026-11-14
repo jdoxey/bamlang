@@ -1,0 +1,36 @@
+== H1 shapes (dyn Shape: describe -> open self-calls name, area) ==
+circle 3.14
+hexagon 10.39
+rect 6.00
+plain Circle area (direct call, no vtable): 3.14
+== H1 widgets (template method; self.focus_next() open) ==
+render Button OK
+render Slider 3/10
+render Badge inbox x3
+render Button Q
+click OK: pressed OK; focus moves to next
+click QuietButton Q: pressed Q; focus stays
+== H1 two roles (field + forwarding) ==
+as widget: Button Save
+as saveable: button:Save
+SaveableButton is a Saveable: no (the Saveable role is a separate ButtonSaver object)
+== H1 LoggedNames (subclass of the built-in List) ==
+a.push(a)
+  log push a
+a.push_all([b, c])
+a = [a b c]
+c.push_all([x, y])
+  log push x
+  log push y
+c.n = 2
+c.push(z)
+  log push z
+c.n = 3
+plain List p.push_all([p, q]) (exactly List)
+p = [p q]
+LoggedAll d.push_all([m])
+  log push m
+fill(dyn List c, [w])
+  log push w
+c.n = 4
+c = [x y z w]

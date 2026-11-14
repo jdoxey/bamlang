@@ -1,0 +1,4 @@
+# expect: inherits `save` from both
+type Saveable { fn save(self) -> Str }
+type Widget { fn save(self) -> Str { return "w" } }
+type Button is Widget, Saveable { label: Str }

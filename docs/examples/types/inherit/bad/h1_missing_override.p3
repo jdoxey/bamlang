@@ -1,0 +1,9 @@
+# expect: `override fn area`
+type Shape {
+  fn area(self) -> Float
+  fn name(self) -> Str { return "shape" }
+}
+type Circle is Shape {
+  r: Float
+  fn area(self) -> Float { return self.r }
+}

@@ -1,0 +1,8 @@
+# expect-clean:
+type Base {
+  hook fn step(self) -> Int { return 1 }
+  fn run(self) -> Int { return self.step() + 1 }
+}
+type Sub is Base {
+  override fn step(self) -> Int { return 10 }
+}

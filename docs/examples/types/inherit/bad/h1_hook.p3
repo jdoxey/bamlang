@@ -1,0 +1,4 @@
+# expect: `hook` is not part of H1
+type A {
+  hook fn a(self) -> Int { return 1 }
+}

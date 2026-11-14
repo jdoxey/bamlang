@@ -1,0 +1,6 @@
+# expect: cannot build `Shape`
+type Shape {
+  fn area(self) -> Float
+  fn name(self) -> Str { return "shape" }
+}
+fn make() -> Shape { return Shape() }

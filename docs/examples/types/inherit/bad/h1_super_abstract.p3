@@ -1,0 +1,5 @@
+# expect: is abstract
+type A { fn a(self) -> Int }
+type C is A {
+  override fn a(self) -> Int { return super.a() }
+}

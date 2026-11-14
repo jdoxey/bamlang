@@ -1,0 +1,3 @@
+# expect: would hide it
+type Base { hook fn step(self) -> Int { return 1 } }
+type Sub is Base { fn step(self) -> Int { return 2 } }

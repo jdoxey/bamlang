@@ -1,0 +1,7 @@
+# expect: is not a parent
+type Widget { fn describe(self) -> Str { return "widget" } }
+type Saveable { fn describe(self) -> Str { return "saveable" } }
+type Other { fn describe(self) -> Str { return "o" } }
+type Button is Widget, Saveable {
+  override fn describe(self) -> Str { return super(Other).describe() }
+}

@@ -1,0 +1,2 @@
+# expect: 2: expected '.' after 'super'
+type A { fn a(self) -> Int { return super(B) } }
