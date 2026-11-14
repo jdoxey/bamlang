@@ -1,0 +1,5 @@
+# expect: 3: variant names must start with a capital letter
+enum Color {
+  red,
+  Green
+}

@@ -1,0 +1,9 @@
+# expect: 6: 'else' must follow the closing '}'
+fn f(x: Int) {
+  if x > 0 {
+    print(text: "pos")
+  }
+  else {
+    print(text: "neg")
+  }
+}

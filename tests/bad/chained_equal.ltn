@@ -1,0 +1,4 @@
+# expect: 3: comparisons don't chain: use `and`
+fn f(a: Int, b: Int, c: Int) -> Bool {
+  return a == b != c
+}

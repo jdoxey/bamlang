@@ -1,0 +1,4 @@
+# expect: 3: argument needs a name
+fn f(xs: List of Int) {
+  print(xs.len())
+}

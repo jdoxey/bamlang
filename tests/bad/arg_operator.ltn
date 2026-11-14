@@ -1,0 +1,4 @@
+# expect: 3: argument needs a name
+fn f(a: Int, b: Int) {
+  show(a + b)
+}

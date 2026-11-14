@@ -1,0 +1,10 @@
+# expect: 4: unclosed `{` from line 4 (the line after it dedents at line 6)
+fn a() {
+  let x = 1
+  for i in 1..3 {
+    print(i)
+}
+
+fn b() {
+  print(2)
+}

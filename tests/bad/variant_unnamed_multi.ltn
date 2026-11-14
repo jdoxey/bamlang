@@ -1,0 +1,5 @@
+# expect: 4: variant fields need names
+enum Shape {
+  Circle(r: Float)
+  Rect(Float, Float)
+}

@@ -1,0 +1,8 @@
+# expect: 4: line ends with `=>`
+fn f(a: Int) -> Int {
+  return match a {
+    1 =>
+      2
+    _ => 3
+  }
+}

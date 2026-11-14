@@ -1,0 +1,7 @@
+# expect: 5: line starts with `.` after `}`
+fn f(xs: List of Int) {
+  if xs.is_empty() {
+    print("empty")
+  }
+    .foo()
+}

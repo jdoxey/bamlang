@@ -1,0 +1,2 @@
+# expect: 2: appears twice
+fn main() { let g = fn(a, a) => a }

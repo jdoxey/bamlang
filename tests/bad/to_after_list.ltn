@@ -1,0 +1,3 @@
+# expect: 2: `to` follows only Map, SortedMap, Lru
+fn f(x: List of Int to Text) {
+}

@@ -1,0 +1,7 @@
+# expect: 4: unexpected '{'
+fn f(items: List of Int) {
+  items.each(f: 1)
+  {
+    print(text: "each")
+  }
+}

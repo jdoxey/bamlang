@@ -1,0 +1,4 @@
+# expect: 3: argument needs a name
+fn f(a: Int) {
+  clamp(value: a, 0, 10)
+}

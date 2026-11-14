@@ -1,0 +1,5 @@
+# expect: 4: line starts with `and`: wrap the whole expression in ( )
+fn f(a: Bool, b: Bool) -> Bool {
+  return a
+    and b
+}

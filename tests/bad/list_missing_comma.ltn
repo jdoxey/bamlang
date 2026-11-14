@@ -1,0 +1,2 @@
+# expect: 2: a `,` is probably missing
+fn f() { let xs = [1 2] }

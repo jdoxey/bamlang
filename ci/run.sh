@@ -20,4 +20,9 @@ for d in docs/examples/*/*/; do
   fi
 done
 
+# 4. M0 conformance harness: unit tests, then the corpus (missing stages allowed until M1).
+cargo test --manifest-path compiler/Cargo.toml --quiet
+cargo run --manifest-path compiler/Cargo.toml -p lantern-tests --quiet -- --allow-missing
+echo "M0 harness OK"
+
 echo "OK"

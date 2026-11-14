@@ -1,0 +1,4 @@
+# expect: 3: function type parameters need names
+type Box {
+  cb: fn(Int, Str) -> Bool
+}

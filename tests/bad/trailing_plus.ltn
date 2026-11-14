@@ -1,0 +1,6 @@
+# expect: 3: line ends with `+`: wrap the whole expression in ( )
+fn f(a: Int, b: Int) -> Int {
+  let x = a +
+    b
+  return x
+}

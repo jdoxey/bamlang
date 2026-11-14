@@ -1,0 +1,5 @@
+# expect: 3: line ends with `not`
+fn f(a: Bool) {
+  let n = not
+    a
+}
