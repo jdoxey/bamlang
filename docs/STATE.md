@@ -2,9 +2,9 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** your issue #5 (inheritance instead of protocols; no final classes; the 3 am test): amending ADR-0005. D10 waits.
+- **Now:** issue #5 (inheritance): clarification pass on the chosen design H1 (single inheritance, required `override`), then amend ADR-0005. D10 waits.
 - **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes), 0009 dependencies (git paths, MVS, hashed, no build scripts). Veto by opening an issue.
-- **Needs you (optional yes/no):** may CI download a SHA-pinned llvm-mingw (182 MB) to test replacing the 6–7 GB Visual Studio Build Tools on Windows? I recommend yes. Until then the default is system clang (D9 records it as interim).
+- **Needs you (optional yes/no):** issue #6 (may a type have extra abstract-only parents? I recommend yes; not blocking). Also: may CI download a SHA-pinned llvm-mingw (182 MB) to test replacing the 6–7 GB VS Build Tools on Windows? I recommend yes.
 
 ## Next action
 
