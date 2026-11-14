@@ -2,22 +2,18 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D10, standard library v1 scope (Light). Issue #5 done: ADR-0005 amendment 1 (single inheritance, `override` required, nothing final).
-- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes), 0009 dependencies (git paths, MVS, hashed, no build scripts). Veto by opening an issue.
+- **Now:** D11, testing, coverage and debugger tooling (Light).
+- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes), 0009 dependencies (git paths, MVS, hashed, no build scripts), 0010 stdlib v1 scope; ADR-0005 amended for inheritance (your issues #5, #6). Veto by opening an issue.
 - **Needs you (optional yes/no):** may CI download a SHA-pinned llvm-mingw (182 MB) to test replacing the 6–7 GB VS Build Tools on Windows? I recommend yes.
 
 ## Next action
 
-D10 also writes the primitive sets for Map, Set, Str and the other container classes (ADR-0005 amendment 1, rule 9).
-
-
-**D10** (ADR-0010, Light: one pass, no subagents, ADR under 60 lines). Inputs that earlier ADRs passed on:
-- ADR-0002 owner answer: the container quality bar (benchmarks against C++ and Rust equivalents, docs, conformance tests); the `extras` repo.
-- ADR-0004: the closed `Error` kind enum, `Report`, `Txn`, `replace`, `try_alloc`.
-- ADR-0007: UI, HTML, build and test libraries (`docs/examples/dsl/lib/`): which ship in v1.
-- ADR-0008: debugger formatters for List, Map, Handle and enums.
-- G6: Lists, Arrays, Maps, time, calendar.
-Then D11 (testing, coverage, debugger tooling; Light) and D12 (name; Light), then M0.
+**D11** (ADR-0011, Light): testing, coverage and debugger tooling (G8–G10). Inputs:
+- ADR-0007: test suites as data (`Group`, `Case`, `body: fn() fails`), the runner names the path; discovery without annotations.
+- ADR-0004: `expect_trap`; traps caught only there and at `try crew`.
+- ADR-0008: coverage via llvm-cov remapped to `.p3`; gdb/lldb/cdb sessions; formatters.
+- ADR-0009: commands `new/build/run/test`.
+Then D12 (name, Light), then M0.
 
 ## Open questions carried forward
 
@@ -36,6 +32,8 @@ Then D11 (testing, coverage, debugger tooling; Light) and D12 (name; Light), the
 - **D9 toolchain spike (T2 llvm-mingw, T3 zig cc on Windows):** the session's permission check denied an agent that would download and run third-party toolchain binaries in CI. Not retried. T1 (system clang, already green on all three OSes in ADR-0008's CI) is the v1 default until John allows the downloads; see ADR-0009.
 
 ## Log
+
+- 2026-11-14: D10 done (ADR-0010, Light).
 
 - 2026-11-14: issue #5 handled (ADR-0005 amendment 1: inheritance; issue #6 asked about abstract-only parents).
 
