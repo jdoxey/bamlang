@@ -9,6 +9,10 @@ S = {
     "H2 stateless parents, closed": dict(am3=3.5, owner=4, safety=3, simple=3, ext=4.5, fit=3.5, impl=3),
     # single inheritance, closed recursion: fewest dynamic self-calls, but the same silent miscount as H2
     "H3 single, closed": dict(am3=4, owner=4.5, safety=3, simple=3.5, ext=3.5, fit=4, impl=4),
+    # after review-h1.md (Fable)
+    "H1 (review)": dict(am3=3, owner=4.5, safety=3, simple=4, ext=3, fit=3.5, impl=3.5),
+    "H2 (review)": dict(am3=3.5, owner=3.5, safety=3.5, simple=3, ext=4.5, fit=3, impl=3),
+    "H3 (review)": dict(am3=3.5, owner=4, safety=3.5, simple=3.5, ext=3, fit=3.5, impl=3.5),
 }
 def total(s, w=W): return sum(s[k] * w[k] / 5 for k in w)
 for n, s in sorted(S.items(), key=lambda x: -total(x[1])): print(f"{total(s):5.1f}  {n}")

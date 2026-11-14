@@ -42,7 +42,7 @@ The 12 `dyn` sites are identical in all three. The finalists differ only in how 
 | H3 single, closed | 4 | 4.5 | 3 | 3.5 | 3.5 | 4 | 4 | 76.5 |
 | H2 stateless parents, closed | 3.5 | 4 | 3 | 3 | 4.5 | 3.5 | 3 | 70.5 |
 
-- **H1 and H3 tie** (a gap of 4), and H3 leads with the 3 am test weighted 35.
+- **H1 and H3 tie** (a gap of 4). H1 still leads with the 3 am test weighted 35 (77.5 against 75.5), corrected per review m1.
 - **The examples break the tie for H1:** the silent miscount under closed recursion is a 3 am failure in behaviour,
   not in lookup.
 - **The reviewer attacks H1.**
