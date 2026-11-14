@@ -2,13 +2,13 @@
 
 ## For John (kept to 10 lines)
 
-- **Now:** D12, the language name and file extension (Light): I propose 5 and pick one; you can veto.
-- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes), 0009 dependencies (git paths, MVS, hashed, no build scripts), 0010 stdlib v1 scope, 0011 test/cover/debug tools; ADR-0005 amended for inheritance (your issues #5, #6). Veto by opening an issue.
+- **Now:** M0, the conformance test harness (all 12 decisions are made). The language is named **Lantern** (`.ltn`); veto by issue if you dislike it.
+- **Decided:** ADR-0001 memory, 0002 containers, 0003 crews, 0004 errors, 0005 types, 0006 syntax (+ amendment 1: every argument `name: value`, your issue #4), 0007 DSLs (`[if c => x, for t in xs => Row(…)]`), 0008 compiler (Rust emitting C for clang; debuggers proven on all three OSes), 0009 dependencies (git paths, MVS, hashed, no build scripts), 0010 stdlib v1 scope, 0011 test/cover/debug tools, 0012 name: Lantern; ADR-0005 amended for inheritance (your issues #5, #6). Veto by opening an issue.
 - **Needs you (optional yes/no):** may CI download a SHA-pinned llvm-mingw (182 MB) to test replacing the 6–7 GB VS Build Tools on Windows? I recommend yes.
 
 ## Next action
 
-**D12** (ADR-0012, Light): propose 5 names and a file extension; check each against existing languages, tools and trademarks (a quick web search), and against typing and saying it; pick one. John can veto by issue. Then rename `p3c`/`.p3` in PLAN.md (the corpus keeps `.p3` until M0 copies it), and start **M0**.
+**M0** (see `docs/PLAN.md`): create the `compiler/` Cargo workspace (no third-party crates) with a `lantern-tests` harness; copy the `p3n` corpus, expected ASTs and bad files into `tests/` as `.ltn`; wire `cargo test` and the harness into `ci/run.sh` on three OSes with `--allow-missing` until M1. Exit: harness runs on Linux, Windows and macOS. Then M1 (parser, ported from `docs/examples/syntax/p3n/parser.py` plus the ADR-0007 clause and ADR-0005 amendment grammar).
 
 ## Open questions carried forward
 
@@ -27,6 +27,8 @@
 - **D9 toolchain spike (T2 llvm-mingw, T3 zig cc on Windows):** the session's permission check denied an agent that would download and run third-party toolchain binaries in CI. Not retried. T1 (system clang, already green on all three OSes in ADR-0008's CI) is the v1 default until John allows the downloads; see ADR-0009.
 
 ## Log
+
+- 2026-11-14: D12 done (ADR-0012: Lantern, Light). Phase 1 decisions complete.
 
 - 2026-11-14: D11 done (ADR-0011, Light).
 

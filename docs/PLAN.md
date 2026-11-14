@@ -6,7 +6,7 @@ tick in `docs/ROADMAP.md`.
 ## Ground rules
 
 - **Layout.**
-  - `compiler/`: one Cargo package, no third-party crates; the binary is `p3c` until D12 names the language.
+  - `compiler/`: one Cargo package, no third-party crates; the binary is `lantern` (ADR-0012); source files are `.ltn`.
   - `runtime/`: C11.
   - `tests/`: conformance.
   - `editors/` and `debug/`: formatters, from M7.
@@ -17,7 +17,7 @@ tick in `docs/ROADMAP.md`.
   stderr and exit code; `tests/bad/` the programs that must fail, each with its first line
   `# expect: LINE: substring`. Never weaken or delete a conformance test to make it pass. A wrong test is fixed only in
   a commit that says why and points to the ADR.
-- **Golden files** update with `cargo run -p p3c-tests -- --update`, and every update diff is reviewed before it is
+- **Golden files** update with `cargo run -p lantern-tests -- --update`, and every update diff is reviewed before it is
   committed.
 - **Each milestone** also adds its own unit tests (`cargo test`) and leaves `docs/STATE.md` pointing at the next one.
 - **The decisions D9–D12** are made just before the milestone that needs them: D9 before M7, D10 before M6, D11 before
@@ -26,7 +26,7 @@ tick in `docs/ROADMAP.md`.
 ## M0: conformance harness
 
 - **Work:**
-  - Copy `docs/examples/syntax/p3n/corpus/*.p3`, `expected/*.ast` and `bad/` into `tests/`, keeping the
+  - Copy `docs/examples/syntax/p3n/corpus/*.p3`, `expected/*.ast` and `bad/` into `tests/`, renaming `.p3` to `.ltn`, keeping the
     meaning-check and label-check scripts as references.
   - Add `tests/run`, a Rust test binary that runs every case through a given stage and compares against golden files.
   - Wire it into `ci/run.sh`.
